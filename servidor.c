@@ -57,7 +57,7 @@ int main() {
     char buffer[1024] = {0}; //Creamos un buffer para almacenar los datos enviados por el cliente.
 
     int new_read = read(new_socket, buffer, sizeof(buffer)); //Leemos los datos enviados por el cliente.
-    if(new_read <0) { //Comprobamos si hubo algún error al leer los datos.
+    if(new_read < 0) { //Comprobamos si hubo algún error al leer los datos.
         printf("Error al leer los datos\n");
         exit(1);
     }
