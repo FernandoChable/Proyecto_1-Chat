@@ -5,7 +5,36 @@
 #include <netinet/in.h>
 #include <string.h>
 #include <strings.h>
+#include <pthread.h>
 
+// Definimos la función que va a ejecutar el hilo que atiende al cliente.
+void *atender_cliente(void *arg) {
+    int socket_cliente = *(int*)arg; // Obtenemos el socket del cliente
+    free(arg); // Liberamos la memoria que se reservó del cliente para evitar errores (explicación más adelante)
+
+    char buffer[1024] = {0}; //Creamos un buffer para almacenar los datos enviados por el cliente.
+
+    // Lectura de datos
+    int new_read = read(socket_cliente, buffer, sizeof(buffer)); //Leemos los datos enviados por el cliente.
+    if(new_read < 0) { //Comprobamos si hubo algún error al leer los datos.
+        printf("Error al leer los datos\n");
+        exit(1);
+    }
+    printf("Datos recibidos del cliente: %s\n", buffer); //Imprimimos los datos para tener una referencia de que sí funciona xd.
+
+    // Respuesta al cliente
+    char *response = "Mensaje recibido correctamente"; //Esto lo creé más que nada para que el servidor tenga algo para enviar en lo que hago el resto de métodos.
+    int new_write = write(socket_cliente, response, strlen(response)); //Enviamos los datos al cliente.
+    if(new_write < 0) { //Comprobamos si hubo algún error al enviar los datos.
+        printf("Error al enviar los datos\n");
+        exit(1);
+    }
+
+    close(socket_cliente); //Cerramos el socket.
+
+}
+
+// Aquí ya empezamos con el main del servidor.
 int main() {
 
     /*
@@ -52,25 +81,16 @@ int main() {
         exit(1);
     }
 
+    // A continuación guardaremos un espacio de memoria para el primer cliente que entre, para que en el caso de que entre un segundo cliente rapidamente no se pierda el primero (no sé si me entendí)
+    int *client_sock = malloc(sizeof(int)); //Creamos un puntero para almacenar el socket del cliente.
+    *client_sock = new_socket; //Asignamos el socket del cliente al puntero.
+
+    pthread_t thread_id; // Creamos un identificador para el hilo de ejecución.
+
+    // Ahora creamos un hilo de ejecución para atender a ese cliente.
+    pthread_create(&thread_id, NULL, atender_cliente, (void*)client_sock);
+
     printf("Se ha conectado un nuevo cliente\n");
-
-    char buffer[1024] = {0}; //Creamos un buffer para almacenar los datos enviados por el cliente.
-
-    int new_read = read(new_socket, buffer, sizeof(buffer)); //Leemos los datos enviados por el cliente.
-    if(new_read < 0) { //Comprobamos si hubo algún error al leer los datos.
-        printf("Error al leer los datos\n");
-        exit(1);
-    }
-    printf("Datos recibidos del cliente: %s\n", buffer); //Imprimimos los datos para tener una referencia de que sí funciona xd.
-
-    char *response = "Mensaje recibido correctamente"; //Esto lo creé más que nada para que el servidor tenga algo para enviar en lo que hago el resto de métodos.
-    int new_write = write(new_socket, response, strlen(response)); //Enviamos los datos al cliente.
-    if(new_write < 0) { //Comprobamos si hubo algún error al enviar los datos.
-        printf("Error al enviar los datos\n");
-        exit(1);
-    }
-
-    close(new_socket); //Cerramos el socket.
 
     return 0;
 }
