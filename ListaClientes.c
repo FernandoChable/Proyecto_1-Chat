@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <strings.h>
 
 // Este programa existe más que nada para poder tener la estructura que se usará para los clientes y no saturar de código el programa del servidor
 
