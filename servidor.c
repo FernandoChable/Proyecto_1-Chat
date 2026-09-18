@@ -6,11 +6,25 @@
 #include <string.h>
 #include <strings.h>
 #include <pthread.h>
+#include <cjson/cJSON.h>
+#include "lista_clientes.h"
+
+// Esta pequeña estructura existe para poder empaquetar los datos que necesitamos en el hilo de ejcución y ya xd
+typedef struct DatosHilo{
+    int socket;
+    ListaClientes *lista;
+} DatosHilo;
 
 // Definimos la función que va a ejecutar el hilo que atiende al cliente.
 void *atender_cliente(void *arg) {
-    int socket_cliente = *(int*)arg; // Obtenemos el socket del cliente
-    free(arg); // Liberamos la memoria que se reservó del cliente para evitar errores (explicación más adelante)
+
+    // Primero vamos a recuperar nuestro DatosHilo
+    DatosHilo *datos = (DatosHilo*)arg;
+
+    int socket_cliente = datos->socket; // Obtenemos el socket del cliente
+    ListaClientes *lista = datos->lista; // Obtenemos la lista
+
+    free(datos); // Liberamos la memoria que usamos para nuestro paquetito de datos
 
     char buffer[1024] = {0}; //Creamos un buffer para almacenar los datos enviados por el cliente.
 
@@ -22,13 +36,12 @@ void *atender_cliente(void *arg) {
     }
     printf("Datos recibidos del cliente: %s\n", buffer); //Imprimimos los datos para tener una referencia de que sí funciona xd.
 
-    // Respuesta al cliente
-    char *response = "Mensaje recibido correctamente"; //Esto lo creé más que nada para que el servidor tenga algo para enviar en lo que hago el resto de métodos.
-    int new_write = write(socket_cliente, response, strlen(response)); //Enviamos los datos al cliente.
-    if(new_write < 0) { //Comprobamos si hubo algún error al enviar los datos.
-        printf("Error al enviar los datos\n");
-        exit(1);
-    }
+    cJSON *json = cJSON_Parse(buffer); // Convertimos los datos del cliente a un objeto JSON    
+
+    // Con esta función de aquí ya se manda cualquier cosa casi xd
+    identificar_tipo(json, socket_cliente, lista);
+
+    cJSON_Delete(json); // Liberamos la memoria del json
 
     close(socket_cliente); //Cerramos el socket.
 
@@ -36,6 +49,9 @@ void *atender_cliente(void *arg) {
 
 // Aquí ya empezamos con el main del servidor.
 int main() {
+
+    // Primero creamos nuestra lista que contendrá a los clientes conectados E IDENTIFICADOS al servidor
+    ListaClientes *lista_clientes = crear_lista();
 
     /*
     Créditos a SanjayRV con su articulo: https://dev.to/sanjayrv/a-beginners-guide-to-socket-programming-in-c-5an5
@@ -74,23 +90,106 @@ int main() {
 
     printf("Servidor esperando conexiones en el puerto 5100...\n"); //Esto lo puse para corroborar que al menos hasta aquí funciona el servidor xd.
 
-    int new_socket = accept(server_fd, NULL, NULL); //Aceptamos la conexión entrante.
-    if(new_socket < 0) { //Comprobamos si hubo algún error al aceptar la conexión.
-        printf("Error al aceptar la conexión\n");
-        close(server_fd);
-        exit(1);
+    // Este bucle sirve para que acepte varias conexiones y no se muera con la primera.
+    while(1) {
+
+        int new_socket = accept(server_fd, NULL, NULL); //Aceptamos la conexión entrante.
+        if(new_socket < 0) { //Comprobamos si hubo algún error al aceptar la conexión.
+            printf("Error al aceptar la conexión\n");
+            close(server_fd);
+            exit(1);
+        }
+
+        // A continuación , guardaremos un espacio de memoria para poder desempaquetar el paquetito de datos que tiene el socket y la lista de clientes (la del mero inicio)
+        DatosHilo *datos = (DatosHilo *)malloc(sizeof(DatosHilo));
+        datos->socket = new_socket; // Asociamos el socket del cliente
+        datos->lista = lista_clientes; // Asociamos la lista de clientes (nos servirá para algunas funciones)
+
+        pthread_t thread_id; // Creamos un identificador para el hilo de ejecución.
+
+        // Ahora creamos un hilo de ejecución para atender a ese cliente.
+        pthread_create(&thread_id, NULL, atender_cliente, (void*)datos);
+
+        printf("Se ha conectado un nuevo cliente\n");
+
     }
 
-    // A continuación guardaremos un espacio de memoria para el primer cliente que entre, para que en el caso de que entre un segundo cliente rapidamente no se pierda el primero (no sé si me entendí)
-    int *client_sock = malloc(sizeof(int)); //Creamos un puntero para almacenar el socket del cliente.
-    *client_sock = new_socket; //Asignamos el socket del cliente al puntero.
-
-    pthread_t thread_id; // Creamos un identificador para el hilo de ejecución.
-
-    // Ahora creamos un hilo de ejecución para atender a ese cliente.
-    pthread_create(&thread_id, NULL, atender_cliente, (void*)client_sock);
-
-    printf("Se ha conectado un nuevo cliente\n");
-
     return 0;
+}
+
+// Aquí abajo voy a definir los métodos de las respuestas que vienen en el protocolo, para intentar tener todo un poco "organizado" (entre muchísimas comillas)
+void identificar_tipo(cJSON *json, int socket_cliente, ListaClientes *lista) {
+    cJSON *type = cJSON_GetObjectItemCaseSensitive(json, "type"); // En type vamos a guardar el tipo de mensaje que mandó el cliente
+
+    // Ahora aquí vamos a revisar cuál es el tipo para saber a qué otra función debe llamar esta función
+    if(cJSON_IsString(type) && (type->valuestring != NULL)) {
+        // Revisamos a qué función pertenece el tipo
+        if(strcmp(type->valuestring, "IDENTIFY") == 0) { // IDENTIFY
+            identify(lista, socket_cliente, json);
+        }
+    }
+}
+
+// Definición de:
+// IDENTIFY
+// :)
+void identify(ListaClientes *lista, int socket_cliente, cJSON *json) {
+    cJSON *username = cJSON_GetObjectItemCaseSensitive(json, "username");
+    cJSON *response = cJSON_CreateObject();
+
+    // Aquí revisamos que el username no exista ya
+    if(buscar_cliente(lista, username->valuestring) == 0) {
+        insertar_cliente(lista, socket_cliente, username->valuestring, "ACTIVE");
+
+        // Empezamos a formar todo el JSON de respuesta
+        cJSON_AddStringToObject(response, "type", "RESPONSE");
+        cJSON_AddStringToObject(response, "operation", "IDENTIFY");
+        cJSON_AddStringToObject(response, "result", "SUCCESS");
+        cJSON_AddStringToObject(response, "extra", username->valuestring);
+
+        // Ahora hacemos el JSON para todos los demás usuarios
+        cJSON *notif = cJSON_CreateObject();
+        cJSON_AddStringToObject(notif, "type", "NEW_USER");
+        cJSON_AddStringToObject(notif, "username", username->valuestring);
+
+        // Luego lo convertimos a string
+        char *notif_str = cJSON_PrintUnformatted(notif);
+
+        // Ahora mandamos el mensaje a todos los demás usuarios
+        notificar_usuarios(lista, socket_cliente, notif_str);
+        
+        // Luego liberamos memoria
+        cJSON_Delete(notif);
+        free(notif_str);
+    } else {
+        // Aquí formamos el JSON de respuesta en caso de que ya exista el username
+        cJSON_AddStringToObject(response, "type", "RESPONSE");
+        cJSON_AddStringToObject(response, "operation", "IDENTIFY");
+        cJSON_AddStringToObject(response, "result", "USER_ALREADY_EXISTS");
+        cJSON_AddStringToObject(response, "extra", username->valuestring);
+    }
+
+    char *response_str = cJSON_PrintUnformatted(response);
+
+    int new_write = write(socket_cliente, response_str, strlen(response_str)); //Enviamos los datos al cliente.
+    if(new_write < 0) { //Comprobamos si hubo algún error al enviar los datos.
+        printf("Error al enviar los datos\n");
+    }
+
+    // Ahora liberamos toooda la memoria usada
+    cJSON_Delete(response);
+    free(response_str);
+}
+
+// Esta siguiente función servirá para notificar cualquier JSON para todos los demás usuarios
+void notificar_usuarios(ListaClientes *lista, int socket_cliente, char *notif_str) {
+    ClienteNodo *actual = lista->cabeza;
+        while(actual != NULL) {
+            // Vamos a enviar el mensaje a los demás usuarios exceptuando al que se acaba de conectar (pues porque ni modo de decirle que acaba de entrar jeje)
+            if(actual->socket != socket_cliente) {
+                write(actual->socket, notif_str, strlen(notif_str));
+            }
+            actual = actual->siguiente;
+        }
+
 }
