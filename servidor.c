@@ -68,14 +68,22 @@ void notificar_usuarios(ListaClientes *lista, int socket_cliente, char *notif_st
 
 }
 
+// Este método lo usamos para identificar el tipo que viene en el JSON
 void identificar_tipo(cJSON *json, int socket_cliente, ListaClientes *lista) {
     cJSON *type = cJSON_GetObjectItemCaseSensitive(json, "type"); // En type vamos a guardar el tipo de mensaje que mandó el cliente
 
     // Ahora aquí vamos a revisar cuál es el tipo para saber a qué otra función debe llamar esta función
     if(cJSON_IsString(type) && (type->valuestring != NULL)) {
         // Revisamos a qué función pertenece el tipo
-        if(strcmp(type->valuestring, "IDENTIFY") == 0) { // IDENTIFY
+
+        // En caso de que type sea IDENTIFY
+        if(strcmp(type->valuestring, "IDENTIFY") == 0) {
             identify(lista, socket_cliente, json);
+        }
+
+        // En caso de que type sea STATUS
+        if(strcmp(type->valuestring, "STATUS") == 0) {
+            status(socket_cliente, json, lista);
         }
     }
 }
@@ -131,7 +139,50 @@ void identify(ListaClientes *lista, int socket_cliente, cJSON *json) {
     free(response_str);
 }
 
+// Definición de
+// STATUS
+// :)
+void status(int socket_cliente, cJSON *json, ListaClientes *lista) {
+    cJSON *status = cJSON_GetObjectItemCaseSensitive(json, "status");
 
+    char *nuevo_status = status->valuestring;
+
+    // Esta parte de aquí la usaremos para poder actualizar el estado del cliente en la lista
+    ClienteNodo *actual = lista->cabeza;
+    
+    while(actual != NULL) {
+        if(actual->socket == socket_cliente) {
+            // Esta comprobación también la hacemos en el lado del cliente así que no impora mucho xd, lo único que importa aquí es ver si el estado del usuario es igual al que quiere poner
+            if((strcmp(nuevo_status, "ACTIVE") == 0 || strcmp(nuevo_status, "AWAY") == 0 || strcmp(nuevo_status, "BUSY") == 0) && strcmp(nuevo_status, actual->status) != 0) {
+                // En caso de que pase la comprobación, actualizamos el estado del usuario
+                strncpy(actual->status, status->valuestring, sizeof(actual->status) - 1);
+                actual->status[sizeof(actual->status) - 1] = '\0';
+
+                // Aquí formaremos el JSON y se lo mandaremos a los demás usuarios
+
+                cJSON *notif = cJSON_CreateObject();
+                cJSON_AddStringToObject(notif, "type", "NEW_STATUS");
+                cJSON_AddStringToObject(notif, "username", actual->username);
+                cJSON_AddStringToObject(notif, "status", nuevo_status);
+
+                char *notif_str = cJSON_PrintUnformatted(notif);
+
+                notificar_usuarios(lista, socket_cliente, notif_str);
+
+                // Liberamos la memoria utilizada
+                cJSON_Delete(notif);
+                free(notif_str);
+
+                return;
+            }
+        }
+
+        actual = actual->siguiente;
+    }
+
+    // Tecnicamente, si terminó el bucle, es porque el usuario no existe
+    printf("Error: El usuario cuyo estado quiere cambiar no se ha identificado");
+}
 
 // Aquí ya empezamos con el main del servidor.
 int main() {

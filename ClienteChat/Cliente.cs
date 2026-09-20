@@ -37,6 +37,94 @@ namespace ClienteChat
             }
         }
 
+        // Este método de aquí lo usaremos para mandar el string de algún json por la red
+        static void MandarString(NetworkStream stream, string json_texto)
+        {
+            byte[] datos_bytes = Encoding.UTF8.GetBytes(json_texto); // Convertimos el string que tiene el JSON a bytes para enviarlo por la red
+            stream.Write(datos_bytes, 0, datos_bytes.Length); // Enviamos esos bytes al servidor
+            Console.WriteLine("Mensaje enviado al servidor."); // Esto igual lo uso como referencia de que funcionó
+        }
+
+        // Este método de aquí va a existir para identificar el comando que introdujo el usuario
+        static void IdentificarTipo(NetworkStream stream, String entrada)
+        {
+            // Ahorita este método solo existe para cerrar el programa del cliente, ya después haré que le notifique al servidor que el cliente va a salir y así
+            if(entrada.Equals("/exit"))
+            {
+                Environment.Exit(0);
+            }
+
+            // Aquí leerá si el comando es identify, para llamar a la función del mismo nombre
+            if(entrada.StartsWith("/identify"))
+            {
+                Identify(stream, entrada);
+            }
+
+            // Aquí leerá si el comando es status, para llamar a la función del mismo nombre
+            if(entrada.StartsWith("/status"))
+            {
+                Status(stream, entrada);
+            }
+        }
+
+        // Definición de
+        // IDENTIFY (del lado del cliente)
+        // :)
+        static void Identify(NetworkStream stream, String entrada)
+        {
+            string[] partes = entrada.Split(' '); // Dividimos la entrada para poder armar el JSON
+
+            if(partes.Length > 1) // Verificamos que no haya sido únicamente el comando y sí haya información importante (el username)
+            {
+                // Empezamos a armar nuestro JSON
+                var iden_json = new JsonObject();
+
+                iden_json["type"] = "IDENTIFY"; // Decimos que el tipo de comando es IDENTIFY
+                iden_json["username"] = partes[1]; // Decimos que el username es el especificado por el usuario
+
+                string json_texto = iden_json.ToJsonString(); // Convertimos el JSON en un string
+                MandarString(stream, json_texto); // Mandamos el JSON
+
+            } else
+            {
+                Console.WriteLine("Error: Debe proporcionar un nombre de usuario."); // Informamos al usuario que la regó xd
+            }   
+        }
+
+        // Definición de
+        // STATUS (del lado del cliente)
+        // :)
+        static void Status(NetworkStream stream, String entrada)
+        {
+            string[] partes = entrada.Split(' '); // Dividimos la entrada para poder armar el JSON
+
+            // Verificamos que haya algo más aparte del comando (en este caso el status)
+            if(partes.Length > 1)
+            {
+                // En el mero caso de que el usuario haya escrito su estado como quiso :v
+                string estado = partes[1].ToUpper();
+
+                // Comprobamos que su estado sea válido
+                if(estado.Equals("ACTIVE") || estado.Equals("AWAY") || estado.Equals("BUSY"))
+                {
+                    // Ahora sí empezamos a armar nuestro JSON
+                    var stat_json = new JsonObject();
+
+                    stat_json["type"] = "STATUS"; // Decimos que el tipo de comando es STATUS
+                    stat_json["status"] = estado; // Decimos que el status es el especificado por el usuario (pero en mayúsculas)
+
+                    string json_texto = stat_json.ToJsonString(); // Convertimos el JSON a un string
+                    MandarString(stream, json_texto); // Mandamos el JSON
+                } else
+                {
+                    Console.WriteLine("Error: Debe proporcionar un estado válido, sea ACTIVE, AWAY ó BUSY"); // Informamos al usuario que la regó de nuevo
+                }
+            } else
+            {
+                Console.WriteLine("Error: Debe proporcionar el estado."); // Informamos al usuario que la regó xd
+            }
+        }
+
         static void Main(string[] args)
         {
             try
@@ -58,36 +146,8 @@ namespace ClienteChat
                         Console.WriteLine("Ingrese su comando:");
                         string entrada = Console.ReadLine(); // Leeremos el comando que ponga el usuario
 
-                        // Este pequeño bloque solo es para cerrar el programa
-                        if(entrada.Equals("/exit"))
-                        {
-                            Environment.Exit(0);
-                        }
-
-                        // Primero haré la parte IDENTIFY del protocolo:
-                        if(entrada.StartsWith("/identify"))
-                        {
-                            string[] partes = entrada.Split(' '); // Dividimos la entrada para poder armar el JSON
-
-                            if(partes.Length > 1) // Verificamos que no haya sido únicamente el comando y sí haya información importante (el username)
-                            {
-                                // Empezamos a armar nuestro JSON
-                                var iden_json = new JsonObject();
-
-                                iden_json["type"] = "IDENTIFY"; // Decimos que el tipo de comando es IDENTIFY
-                                iden_json["username"] = partes[1]; // Decimos que el username es el especificado por el usuario
-
-                                string json_texto = iden_json.ToJsonString(); // Convertimos el JSON en un string
-                                byte[] datos_bytes = Encoding.UTF8.GetBytes(json_texto); // Convertimos el string que tiene el JSON a bytes para enviarlo por la red
-                                stream.Write(datos_bytes, 0, datos_bytes.Length); // Enviamos esos bytes al servidor
-                                Console.WriteLine("Mensaje enviado al servidor."); // Esto igual lo uso como referencia de que funcionó
-
-                            } else
-                            {
-                                Console.WriteLine("Error: Debe proporcionar un nombre de usuario."); // Informamos al usuario que la regó xd
-                                continue;
-                            }   
-                        }
+                        IdentificarTipo(stream, entrada); // Identificamos el comando que introdujo el usuario
+                        
                     }
                     
                 }
