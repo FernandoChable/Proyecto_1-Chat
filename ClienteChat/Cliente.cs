@@ -79,6 +79,12 @@ namespace ClienteChat
             {
                 Text(stream, entrada);
             }
+
+            // Aquí leerá si el comando es public_text, para llamar a la función del mismo nombre
+            if(entrada.StartsWith("/public_text"))
+            {
+                PublicText(stream, entrada);
+            }
         }
 
         // Definición de
@@ -183,6 +189,31 @@ namespace ClienteChat
             }
         }
 
+        // Definición de
+        // PUBLIC_TEXT (del lado del cliente)
+        // :)
+        static void PublicText(NetworkStream stream, String entrada)
+        {
+            // Parecido a TEXT, vamos a partir la cadena pero ahora solo en dos partes, pues solamente son el comando y el mensaje, pues este último va para todos
+            string[] partes = entrada.Split(' ', 2);
+
+            // Verificamos que en efecto, exista un mensaje :v
+            if(partes.Length > 1)
+            {
+                // Empezamos a crear el JSON que vamos a mandarle al servidor
+                var publictext_json = new JsonObject();
+
+                publictext_json["type"] = "PUBLIC_TEXT"; // Decimos que es de tipo PUBLIC_TEXT
+                publictext_json["text"] = partes[1]; // Decimos que el mensaje es el resto de la entrada
+
+                // Por quinta vez y contandoooo mandamos el JSON
+                string json_texto = publictext_json.ToJsonString();
+                MandarString(stream, json_texto);
+            } else
+            {
+                Console.WriteLine("Error: Debe introducir un mensaje, el formato del comando es /public_text <mensaje_<_enviar>");
+            }
+        }
         static void Main(string[] args)
         {
             try
@@ -201,7 +232,7 @@ namespace ClienteChat
                     while(true)
                     {
                         // Como aún no tengo nada de la interfaz gráfica, lo manejaré de momento con comandos
-                        Console.WriteLine("Ingrese su comando:");
+                        Console.Write("> ");
                         string entrada = Console.ReadLine(); // Leeremos el comando que ponga el usuario
 
                         IdentificarTipo(stream, entrada); // Identificamos el comando que introdujo el usuario

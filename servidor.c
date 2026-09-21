@@ -103,6 +103,11 @@ void identificar_tipo(cJSON *json, int socket_cliente, ListaClientes *lista) {
         if(strcmp(type->valuestring, "TEXT") == 0) {
             text(socket_cliente, json, lista);
         }
+
+        // En caso de que sea type PUBLIC_TEXT
+        if(strcmp(type->valuestring, "PUBLIC_TEXT") == 0) {
+            publictext(socket_cliente, json, lista);
+        }
     }
 }
 
@@ -304,6 +309,41 @@ void text(int socket_cliente, cJSON *json, ListaClientes *lista) {
 
         free(response_str);
         cJSON_Delete(response);
+    }
+}
+
+// Definición de
+// PUBLIC_TEXT
+// :)
+void publictext(int socket_cliente, cJSON *json, ListaClientes *lista) {
+    cJSON *message = cJSON_GetObjectItemCaseSensitive(json, "text");
+
+    // En este caso, no hay que revisar si el usuario existe porque pues, es para todos, si acaso lo que hay que revisar es si hay más de un usuario, para que en caso de que no, no haga nada
+    if(lista->numClientes > 1) {
+        // Hay que iterar en la lista para poder saber quién mandó el mensaje xd
+        char *username_emisor;
+
+        ClienteNodo *actual = lista->cabeza;
+        while(actual != NULL) {
+            // Ha vuelto la mausquerramienta
+            if(actual->socket == socket_cliente) {
+                username_emisor = actual->username;
+            }
+            actual = actual->siguiente;
+        }
+
+        // Empezamos a formar el JSON
+        cJSON *notif = cJSON_CreateObject();
+        cJSON_AddStringToObject(notif, "type", "PUBLIC_TEXT_FROM");
+        cJSON_AddStringToObject(notif, "username", username_emisor);
+        cJSON_AddStringToObject(notif, "text", message->valuestring);
+
+        // Y se lo mandamos a todoooos (menos al usuario que lo mandó obvio xd)
+        char *notif_str = cJSON_PrintUnformatted(notif);
+        notificar_usuarios(lista, socket_cliente, notif_str);
+
+        free(notif_str);
+        cJSON_Delete(notif);
     }
 }
 
