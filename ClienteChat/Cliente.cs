@@ -2,6 +2,8 @@ using System;
 using System.Text;
 using System.Text.Json.Nodes;
 using System.Net.Sockets;
+using Microsoft.VisualBasic;
+using System.Reflection;
 
 namespace ClienteChat
 {
@@ -65,6 +67,18 @@ namespace ClienteChat
             {
                 Status(stream, entrada);
             }
+
+            // Aquí leerá si el comando es users, para llamar a la función del mismo nombre
+            if(entrada.StartsWith("/users"))
+            {
+                Users(stream);
+            }
+
+            // Aquí leerá si el comando es text, para llamar a la función del mismo nombre
+            if(entrada.StartsWith("/text"))
+            {
+                Text(stream, entrada);
+            }
         }
 
         // Definición de
@@ -122,6 +136,50 @@ namespace ClienteChat
             } else
             {
                 Console.WriteLine("Error: Debe proporcionar el estado."); // Informamos al usuario que la regó xd
+            }
+        }
+
+        // Definición de
+        // USERS (del lado del cliente)
+        // :)
+        static void Users(NetworkStream stream)
+        {
+            // Como aquí es simplemente un comando y no hay nada más de información importante, no hace falta ni que usemos la entrada del usuario
+            var users_json = new JsonObject();
+
+            users_json["type"] = "USERS";
+
+            // Ps un poco más de lo de siempre, mandamos el JSON al servidor y ya :v
+            string json_texto = users_json.ToJsonString();
+            MandarString(stream, json_texto);
+
+            // No puedo creer lo sencilla que fue esta parte
+        }
+
+        // Definición de
+        // TEXT (del lado del cliente)
+        // :)
+        static void Text(NetworkStream stream, String entrada)
+        {
+            // Aquí vamos a dividir la entrada únicamente en tres partes, esto porque el formato sería /text <usuario> <mensaje>, y no queremos que el mensaje se divida también
+            string[] partes = entrada.Split(' ', 3);
+
+            // Verificamos que no haga falta información importante, en este caso aparte del comando también se tiene que escribir el destinatario y el mensaje
+            if(partes.Length > 2)
+            {
+                // Empezamos a crear nuestro JSON
+                var text_json = new JsonObject();
+
+                text_json["type"] = "TEXT"; // Decimos que es de tipo TEXT
+                text_json["username"] = partes[1]; // Decimos quién es el destinatario
+                text_json["text"] = partes[2]; // Decimos que el mensaje es el resto de la entrada
+
+                // Por como cuarta vez, mandamos el JSON :v
+                string json_texto = text_json.ToJsonString();
+                MandarString(stream, json_texto);
+            } else
+            {
+                Console.WriteLine("Error: El formato del comando es /text <usuario_destinatario> <mensaje_a_enviar>");
             }
         }
 

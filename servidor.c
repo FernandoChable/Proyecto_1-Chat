@@ -26,7 +26,12 @@ void *atender_cliente(void *arg) {
 
     free(datos); // Liberamos la memoria que usamos para nuestro paquetito de datos
 
-    char buffer[1024] = {0}; //Creamos un buffer para almacenar los datos enviados por el cliente.
+    char *buffer = (char *)malloc(1048576); //Creamos un buffer para almacenar los datos enviados por el cliente. (ACTUALIZACIÓN: Cambié el tamaño de 1024 bytes a 1,048,576 para que sea de exatcamente 1mb)
+    if(buffer == NULL) {
+        printf("Error: No se puede asignar memoria en el buffer.");
+        close(socket_cliente);
+        return NULL;
+    }
 
     while(1) {
         // Limpiamos el buffer en cada iteración nueva
@@ -50,6 +55,7 @@ void *atender_cliente(void *arg) {
     }
 
     close(socket_cliente); //Cerramos el socket.
+    free(buffer); // Liberamos todo el buffer del cliente
 
 }
 
@@ -84,6 +90,16 @@ void identificar_tipo(cJSON *json, int socket_cliente, ListaClientes *lista) {
         // En caso de que type sea STATUS
         if(strcmp(type->valuestring, "STATUS") == 0) {
             status(socket_cliente, json, lista);
+        }
+
+        // En caso de que type sea USERS
+        if(strcmp(type->valuestring, "USERS") == 0) {
+            users(socket_cliente, lista);
+        }
+
+        // En caso de que sea type TEXT
+        if(strcmp(type->valuestring, "TEXT") == 0) {
+            
         }
     }
 }
@@ -182,6 +198,61 @@ void status(int socket_cliente, cJSON *json, ListaClientes *lista) {
 
     // Tecnicamente, si terminó el bucle, es porque el usuario no existe
     printf("Error: El usuario cuyo estado quiere cambiar no se ha identificado");
+}
+
+// Definición de
+// USERS
+// :)
+void users(int socket_cliente, ListaClientes *lista) {
+    // Empezaremos directamente creando la respuesta pues es la parte más simple del protocolo (hasta ahora)
+    cJSON *response = cJSON_CreateObject();
+    cJSON_AddStringToObject(response, "type", "USER_LIST");
+
+    // Ahora vamos a crear un JSON que almacenará toooooda la lista de usuarios
+    cJSON *user_list = cJSON_CreateObject();
+
+    // Y ahora vamos a recorrer toda la lista de usuarios para poder añadirlos a la lista
+    ClienteNodo *actual = lista->cabeza;
+    while(actual != NULL) {
+        cJSON_AddStringToObject(user_list, actual->username, actual->status);
+        actual = actual->siguiente;
+    }
+
+    // Metemos la lista de usuarios al JSON
+    cJSON_AddItemToObject(response, "users", user_list);
+
+    // Lo mandamos al usuario que lo solicitó
+    char *response_str = cJSON_PrintUnformatted(response);
+
+    if(response_str != NULL) {
+        int new_write = write(socket_cliente, response_str, strlen(response_str));
+        if(new_write < 0) {
+            printf("Error al enviar los datos\n");
+        }
+
+        free(response_str);
+    }
+
+    cJSON_Delete(response);
+}
+
+// Definición de
+// TEXT
+// :)
+void text(int socket_cliente, cJSON *json, ListaClientes *lista) {
+    cJSON *username = cJSON_GetObjectItemCaseSensitive(json, "username");
+    cJSON *message = cJSON_GetObjectItemCaseSensitive(json, "text");
+
+    // Primero, confirmaremos que en efecto existe el usuario al que se le quiere mandar el mensaje
+    if(buscar_cliente(lista, username->valuestring) == 0) {
+
+    } else { // En caso de que no exista, el servidor responderá
+        cJSON *response = cJSON_CreateObject();
+        cJSON_AddStringToObject(response, "type", "RESPONSE");
+        cJSON_AddStringToObject(response, "operation", "TEXT");
+        cJSON_AddStringToObject(response, "result", "NO_SUCH_USER");
+        cJSON_AddStringToObject(response, "extra", username->valuestring);
+    }
 }
 
 // Aquí ya empezamos con el main del servidor.
