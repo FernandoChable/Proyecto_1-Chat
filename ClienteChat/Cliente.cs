@@ -190,7 +190,7 @@ namespace ClienteChat
                 // Esto solo lo usaré como referencia xd
                 Console.WriteLine("Conectando con el servidor...");
 
-                using(TcpClient cliente = new TcpClient("192.168.100.85", 5100)) // El cliente se conectará por la IP de mi internet (de momento) por el puerto 5100
+                using(TcpClient cliente = new TcpClient("127.0.0.1", 5100)) // El cliente se conectará por la IP de mi internet (de momento) por el puerto 5100
                 using(NetworkStream stream = cliente.GetStream())
                 {
                     Console.WriteLine("Conexión con el servidor lograda con éxito");

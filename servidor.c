@@ -26,7 +26,9 @@ void *atender_cliente(void *arg) {
 
     free(datos); // Liberamos la memoria que usamos para nuestro paquetito de datos
 
-    char *buffer = (char *)malloc(1048576); //Creamos un buffer para almacenar los datos enviados por el cliente. (ACTUALIZACIÓN: Cambié el tamaño de 1024 bytes a 1,048,576 para que sea de exatcamente 1mb)
+    size_t tamano_buffer = 1048576; // Esto de aquí lo hice porque empezó a haber un error en el que los json se mostraban todos fragmentados
+
+    char *buffer = (char *)malloc(tamano_buffer); //Creamos un buffer para almacenar los datos enviados por el cliente. (ACTUALIZACIÓN: Cambié el tamaño de 1024 bytes a 1,048,576 para que sea de exatcamente 1mb)
     if(buffer == NULL) {
         printf("Error: No se puede asignar memoria en el buffer.");
         close(socket_cliente);
@@ -35,10 +37,10 @@ void *atender_cliente(void *arg) {
 
     while(1) {
         // Limpiamos el buffer en cada iteración nueva
-        memset(buffer, 0, sizeof(buffer));
+        memset(buffer, 0, tamano_buffer);
 
         // Lectura de datos
-        int new_read = read(socket_cliente, buffer, sizeof(buffer)); //Leemos los datos enviados por el cliente.
+        int new_read = read(socket_cliente, buffer, tamano_buffer); //Leemos los datos enviados por el cliente.
         if(new_read < 0) { //Comprobamos si hubo algún error al leer los datos.
             printf("Error al leer los datos\n");
             break;
@@ -99,7 +101,7 @@ void identificar_tipo(cJSON *json, int socket_cliente, ListaClientes *lista) {
 
         // En caso de que sea type TEXT
         if(strcmp(type->valuestring, "TEXT") == 0) {
-            
+            text(socket_cliente, json, lista);
         }
     }
 }
@@ -244,7 +246,47 @@ void text(int socket_cliente, cJSON *json, ListaClientes *lista) {
     cJSON *message = cJSON_GetObjectItemCaseSensitive(json, "text");
 
     // Primero, confirmaremos que en efecto existe el usuario al que se le quiere mandar el mensaje
-    if(buscar_cliente(lista, username->valuestring) == 0) {
+    if(buscar_cliente(lista, username->valuestring) == 1) {
+
+        //Vamos a iterar en la lista de usuarios, por lo que vamos a guardar el socket del usuario al que se le quiere mandar el mensaje
+        int socket_destino = 0;
+        // También como soy tonto, voy a usar el while que ya teníamos para poder obtener el username de la persona que manda el mensaje xd
+        char *username_emisor;
+
+        ClienteNodo *actual = lista->cabeza;
+
+        while(actual != NULL) {
+            // Si esta condición de aquí se cumple, quiere decir que ya encontró al usuario al que se le quiere mandar mensaje
+            if(strcmp(actual->username, username->valuestring) == 0) {
+                socket_destino = actual->socket;
+            }
+
+            // Esta mausquerramienta de aquí nos ayudará más tarde (encontrar el username del emisor)
+            if(actual->socket == socket_cliente) {
+                username_emisor = actual->username;
+            }
+
+            // Si no pasa la condición, revisamos si el siguiente en la lista es el que buscamos
+            actual = actual->siguiente;
+        }
+
+        // Ya que haya salido del while, entonces vamos a formar el json que contendrá al mensaje
+        cJSON *notif = cJSON_CreateObject();
+        cJSON_AddStringToObject(notif, "type", "TEXT_FROM");
+        cJSON_AddStringToObject(notif, "username", username_emisor);
+        cJSON_AddStringToObject(notif, "text", message->valuestring);
+
+        // Y ps lo mandamos
+        char *notif_str = cJSON_PrintUnformatted(notif);
+
+        int new_write = write(socket_destino, notif_str, strlen(notif_str));
+        if(new_write < 0) {
+            printf("Error al enciar los datos\n");
+        }
+
+        // Y ps ya liberamos la memoria usada
+        free(notif_str);
+        cJSON_Delete(notif);
 
     } else { // En caso de que no exista, el servidor responderá
         cJSON *response = cJSON_CreateObject();
@@ -252,6 +294,16 @@ void text(int socket_cliente, cJSON *json, ListaClientes *lista) {
         cJSON_AddStringToObject(response, "operation", "TEXT");
         cJSON_AddStringToObject(response, "result", "NO_SUCH_USER");
         cJSON_AddStringToObject(response, "extra", username->valuestring);
+
+        char *response_str = cJSON_PrintUnformatted(response);
+
+        int new_write = write(socket_cliente, response_str, strlen(response_str));
+        if(new_write < 0) {
+            printf("Error al enviar los datos\n");
+        }
+
+        free(response_str);
+        cJSON_Delete(response);
     }
 }
 
