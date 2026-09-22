@@ -92,19 +92,25 @@ namespace ClienteChat
         // :)
         static void Identify(NetworkStream stream, String entrada)
         {
-            string[] partes = entrada.Split(' '); // Dividimos la entrada para poder armar el JSON
+            string[] partes = entrada.Split(' ', 2); // Dividimos la entrada para poder armar el JSON
 
             if(partes.Length > 1) // Verificamos que no haya sido únicamente el comando y sí haya información importante (el username)
             {
-                // Empezamos a armar nuestro JSON
-                var iden_json = new JsonObject();
+                // Verifficamos que el nombre de usuario no sea mayor a 8 caracteres
+                if(partes[2].Length <= 8)
+                {
+                    // Empezamos a armar nuestro JSON
+                    var iden_json = new JsonObject();
 
-                iden_json["type"] = "IDENTIFY"; // Decimos que el tipo de comando es IDENTIFY
-                iden_json["username"] = partes[1]; // Decimos que el username es el especificado por el usuario
+                    iden_json["type"] = "IDENTIFY"; // Decimos que el tipo de comando es IDENTIFY
+                    iden_json["username"] = partes[1]; // Decimos que el username es el especificado por el usuario
 
-                string json_texto = iden_json.ToJsonString(); // Convertimos el JSON en un string
-                MandarString(stream, json_texto); // Mandamos el JSON
-
+                    string json_texto = iden_json.ToJsonString(); // Convertimos el JSON en un string
+                    MandarString(stream, json_texto); // Mandamos el JSON
+                } else
+                {
+                    Console.WriteLine("Error: El nombre de usuario solo puede tener a lo mucho 8 caracteres");
+                }
             } else
             {
                 Console.WriteLine("Error: Debe proporcionar un nombre de usuario."); // Informamos al usuario que la regó xd
@@ -214,6 +220,19 @@ namespace ClienteChat
                 Console.WriteLine("Error: Debe introducir un mensaje, el formato del comando es /public_text <mensaje_<_enviar>");
             }
         }
+
+        // Definición de
+        // NEW_ROOM (del lado del cliente)
+        // :)
+        static void NewRoom(NetworkStream stream, String entrada)
+        {
+            // Primero vamos a dividir la entrada en dos partes, el comando y el nombre de la sala
+            string[] partes = entrada.Split(' ', 2);
+
+            // Verificamos que no solo esté el comando y sí esté el nombre de la sala
+            if()
+        }
+
         static void Main(string[] args)
         {
             try

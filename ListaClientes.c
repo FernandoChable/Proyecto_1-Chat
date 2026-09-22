@@ -8,7 +8,7 @@
 // Aquí definimos la estructura para los nodos de los clientes
 typedef struct ClienteNodo{
     int socket; // Guardaremos el socket del cliente
-    char username[20]; // Guardaremos su username (ponemos 20 de capacidad por si las moscas)
+    char username[10]; // Guardaremos su username (ponemos 20 de capacidad por si las moscas)
     char status[7]; // Guardaremos su estado (solo ponemos de capacidad 6 porque el estado más largo es ACTIVE, dice 7 porque también se incluye el caracter nulo)
     struct ClienteNodo *siguiente; // Y como es una lista ligada simple, guardamos su siguiente nodo
 } ClienteNodo;
@@ -21,7 +21,7 @@ typedef struct ListaClientes{
 
 // Ahora, haremos lo que sería el equivalente a un constructor en otros lenguajes para poder crear nuestra lista (Canek me va a matar x'd)
 ListaClientes* crear_lista() {
-    ListaClientes *lista = (ListaClientes *)malloc(sizeof(ListaClientes)); // Reservamos la respectivda memoria para la lista
+    ListaClientes *lista = (ListaClientes *)malloc(sizeof(ListaClientes)); // Reservamos la respectiva memoria para la lista
     
     lista->cabeza = NULL; // Iniciamos la cabeza de la lista en NULL
     lista->numClientes = 0; // Como obviamente no hay clientes al crear la lista, es 0
@@ -45,10 +45,10 @@ void insertar_cliente(ListaClientes *lista, int socket, const char *username, co
     lista->numClientes++;
 }
 
-// Ahora haremos un método para poder eliminar a un cliente de la lista (*sufrimiento*)
-void eliminar_cliente(ListaClientes *lista, ClienteNodo *cliente) {
+// Ahora haremos un método para poder eliminar a un cliente de la lista (*sufrimiento*) (ACTUALIZACIÓN: Hice que ahora se eliminara al cliente según su socket, más que nada para eliminar exactamente al que queremos eliminar)
+void eliminar_cliente(ListaClientes *lista, int socket){
     // Primero revisamos si el cliente a borrar es el primero
-    if(strcmp(lista->cabeza->username, cliente->username) == 0) {
+    if(lista->cabeza->socket == socket) {
         ClienteNodo *a_eliminar = lista->cabeza;
         lista->cabeza = lista->cabeza->siguiente;
         free(a_eliminar);
@@ -62,7 +62,7 @@ void eliminar_cliente(ListaClientes *lista, ClienteNodo *cliente) {
 
     while (actual != NULL)
     {
-        if(strcmp(actual->username, cliente->username) == 0) {
+        if(actual->socket == socket) {
             anterior->siguiente = actual->siguiente;
             free(actual);
             lista->numClientes--;
@@ -75,7 +75,6 @@ void eliminar_cliente(ListaClientes *lista, ClienteNodo *cliente) {
 
     // Ya si llegó aquí el código es porque de plano no existía el desgraciado :v
     printf("No se encontró al cliente a eliminar.");
-    
 }
 
 // Después, haremos un método que verifique si el cliente ya existe o aún no en la lista (nos servirá para el identify)
@@ -98,10 +97,11 @@ int buscar_cliente(ListaClientes *lista, const char *username) {
 
 // Ya por último ahora sí, haremos un método que limpie toda la lista y tan tan
 void limpiar_lista(ListaClientes *lista) {
-    // Primero comprobaremos que sí haya al menos un cliente en la lista
+    // Primero comprobaremos si no hay clientes en la lista
     if (lista->numClientes == 0)
     {
         printf("No hay clientes en la lista chaval :v\n");
+        free(lista);
         return;
     }
     

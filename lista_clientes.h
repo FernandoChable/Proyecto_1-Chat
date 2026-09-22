@@ -15,7 +15,7 @@ typedef struct {
 
 ListaClientes* crear_lista();
 void insertar_cliente(ListaClientes *lista, int socket, const char *username, const char *status);
-void eliminar_cliente(ListaClientes *lista, ClienteNodo *cliente);
+void eliminar_cliente(ListaClientes *lista, int socket);
 int buscar_cliente(ListaClientes *lista, const char *username);
 void limpiar_lista(ListaClientes *lista);
 
