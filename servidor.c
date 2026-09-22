@@ -8,6 +8,7 @@
 #include <pthread.h>
 #include <cjson/cJSON.h>
 #include "lista_clientes.h"
+#include "lista_salas.h"
 
 // Esta pequeña estructura existe para poder empaquetar los datos que necesitamos en el hilo de ejcución y ya xd
 typedef struct DatosHilo{
@@ -347,11 +348,36 @@ void publictext(int socket_cliente, cJSON *json, ListaClientes *lista) {
     }
 }
 
+// Definición de
+// NEW_ROOM
+// :)
+void newroom(int socket_cliente, cJSON *json, ListaSalas *lista) {
+    cJSON *room_name = cJSON_GetObjectItemCaseSensitive(json, "roomname");
+    cJSON *response = cJSON_CreateObject();
+
+    // Primero vamos a comprobar que la sala no exista ya, en caso de que sí pues le decimos al usuario que ya existe una sala con ese nombre
+    if(buscar_sala(lista, room_name->valuestring) == 1) {
+        cJSON_AddStringToObject(response, "type", "RESPONSE");
+        cJSON_AddStringToObject(response, "operation", "NEW_ROOM");
+        cJSON_AddStringToObject(response, "result", "ROOM_ALREADY_EXISTS");
+        cJSON_AddStringToObject(response, "extra", room_name->valuestring);
+    } else {
+        // En caso de que no exista ya, la creamos :D
+        insertar_sala(lista, room_name->valuestring);
+
+        // Ahor
+    }
+
+}
+
 // Aquí ya empezamos con el main del servidor.
 int main() {
 
     // Primero creamos nuestra lista que contendrá a los clientes conectados E IDENTIFICADOS al servidor
     ListaClientes *lista_clientes = crear_lista();
+
+    // Ahora creamos una lista que contendrá a las salas que se creen (por si acaso xd)
+    ListaSalas *lista_salas = crear_lista_salas();
 
     /*
     Créditos a SanjayRV con su articulo: https://dev.to/sanjayrv/a-beginners-guide-to-socket-programming-in-c-5an5

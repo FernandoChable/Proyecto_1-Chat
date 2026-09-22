@@ -91,6 +91,25 @@ int buscar_sala(ListaSalas *lista, const char *room_name) {
     return 0;
 }
 
+// Ahora, hacemos un método para buscar una sala en específico y que la devuelva
+NodoSala obtener_sala(ListaSalas *lista, const char *room_name) {
+
+    
+
+    // Va a ser muy parecido al método buscar_sala
+    NodoSala *actual = lista->cabeza;
+
+    while(actual != NULL) {
+        if(strcmp(actual->room_name, room_name) == 0) {
+            return actual;
+        }
+
+        actual = actual->siguiente;
+    }
+
+
+}
+
 // Por último, haremos un método para limpiar toda la lista y no dejar un cacho de memoria todo feo ahí solito
 void limpiar_lista_salas(ListaSalas *lista) {
     // Primero comprobaremos si no hay salas en la lista

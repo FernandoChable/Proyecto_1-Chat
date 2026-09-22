@@ -85,6 +85,12 @@ namespace ClienteChat
             {
                 PublicText(stream, entrada);
             }
+
+            // Aquí leerá si el comando es new_room, para llamar a la función del mismo nombre
+            if(entrada.StartsWith("/new_room"))
+            {
+                NewRoom(stream, entrada);
+            }
         }
 
         // Definición de
@@ -230,7 +236,28 @@ namespace ClienteChat
             string[] partes = entrada.Split(' ', 2);
 
             // Verificamos que no solo esté el comando y sí esté el nombre de la sala
-            if()
+            if(partes.Length < 2)
+            {
+                // Ahora, verificamos que el nombre sea de a lo mucho 16 caracteres
+                if(partes[2].Length <= 8)
+                {
+                    // Ya que haya pasado esas dos verificaciones, ahora sí podemos empezar a trabajar
+                    var newroom_json = new JsonObject();
+
+                    newroom_json["type"] = "NEW_ROOM";
+                    newroom_json["roomname"] = partes[1];
+
+                    // Por sexta vez siiiii mandamos el JSON
+                    string json_texto = newroom_json.ToJsonString();
+                    MandarString(stream, json_texto);
+                } else
+                {
+                    Console.WriteLine("Error: El nombre del cuarto debe ser de máximo 16 caracteres");
+                }
+            } else
+            {
+                Console.WriteLine("Error: Debes proporcionar un nombre para el cuarto (xd)");
+            }
         }
 
         static void Main(string[] args)
