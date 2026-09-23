@@ -98,12 +98,12 @@ namespace ClienteChat
         // :)
         static void Identify(NetworkStream stream, String entrada)
         {
-            string[] partes = entrada.Split(' ', 2); // Dividimos la entrada para poder armar el JSON
+            string[] partes = entrada.Split(' '); // Dividimos la entrada para poder armar el JSON
 
             if(partes.Length > 1) // Verificamos que no haya sido únicamente el comando y sí haya información importante (el username)
             {
                 // Verifficamos que el nombre de usuario no sea mayor a 8 caracteres
-                if(partes[2].Length <= 8)
+                if(partes[1].Length <= 8)
                 {
                     // Empezamos a armar nuestro JSON
                     var iden_json = new JsonObject();
@@ -236,10 +236,10 @@ namespace ClienteChat
             string[] partes = entrada.Split(' ', 2);
 
             // Verificamos que no solo esté el comando y sí esté el nombre de la sala
-            if(partes.Length < 2)
+            if(partes.Length < 3)
             {
                 // Ahora, verificamos que el nombre sea de a lo mucho 16 caracteres
-                if(partes[2].Length <= 8)
+                if(partes[1].Length <= 8)
                 {
                     // Ya que haya pasado esas dos verificaciones, ahora sí podemos empezar a trabajar
                     var newroom_json = new JsonObject();

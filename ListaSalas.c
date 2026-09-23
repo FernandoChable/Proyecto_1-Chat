@@ -9,7 +9,7 @@
 // Aquí definimos la estructura para los nodos de las salas
 typedef struct NodoSala{
     char room_name[20]; // Aquí guardaremos el nombre de la sala
-    ListaClientes usuarios; // Aquí guardaremos los usuarios que son miembros de la sala
+    ListaClientes *usuarios; // Aquí guardaremos los usuarios que son miembros de la sala
     struct NodoSala *siguiente; // Y aquí guardaremos la sala que le sigue a esta en la lista
 } NodoSala;
 
@@ -35,6 +35,7 @@ void insertar_sala(ListaSalas *lista, const char *room_name) {
 
     strncpy(nueva_sala->room_name, room_name, sizeof(nueva_sala->room_name) - 1); // Asignamos el nombre de la sala (de nuevo, el -1 es para dejar un espacio para el caracter nulo)
     nueva_sala->room_name[sizeof(nueva_sala->room_name) - 1] = '\0';
+    nueva_sala->usuarios = crear_lista();
 
     // Aquí añadimos la nueva sala a la lista
     nueva_sala->siguiente = lista->cabeza;
@@ -92,9 +93,12 @@ int buscar_sala(ListaSalas *lista, const char *room_name) {
 }
 
 // Ahora, hacemos un método para buscar una sala en específico y que la devuelva
-NodoSala obtener_sala(ListaSalas *lista, const char *room_name) {
+NodoSala* obtener_sala(ListaSalas *lista, const char *room_name) {
 
-    
+    // Esta validación de aquí es solo por seguridad
+    if(lista == NULL || room_name == NULL) {
+        return NULL;
+    }
 
     // Va a ser muy parecido al método buscar_sala
     NodoSala *actual = lista->cabeza;
@@ -107,6 +111,8 @@ NodoSala obtener_sala(ListaSalas *lista, const char *room_name) {
         actual = actual->siguiente;
     }
 
+    // Si no encontró la sala ps devuelve NULL
+    return NULL;
 
 }
 

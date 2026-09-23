@@ -4,7 +4,7 @@
 
 typedef struct NodoSala {
     char room_name[20];
-    ListaClientes usuarios;
+    ListaClientes *usuarios;
     struct NodoSala *siguiente;
 } NodoSala;
 
@@ -17,6 +17,7 @@ ListaSalas* crear_lista_salas();
 void insertar_sala(ListaSalas *lista, const char *room_name);
 void eliminar_sala(ListaSalas *lista, const char *room_name);
 int buscar_sala(ListaSalas *lista, const char *room_name);
+NodoSala* obtener_sala(ListaSalas *lista, const char *room_name);
 void limpiar_lista_salas(ListaSalas *lista);
 
 #endif
