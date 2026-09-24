@@ -1,0 +1,15 @@
+/home/chicles_fernan/Documentos/Modelado/Proyecto_1-Chat/src/cliente/ClienteChat/obj/Debug/net8.0/ClienteChat.GeneratedMSBuildEditorConfig.editorconfig
+/home/chicles_fernan/Documentos/Modelado/Proyecto_1-Chat/src/cliente/ClienteChat/obj/Debug/net8.0/ClienteChat.AssemblyInfoInputs.cache
+/home/chicles_fernan/Documentos/Modelado/Proyecto_1-Chat/src/cliente/ClienteChat/obj/Debug/net8.0/ClienteChat.AssemblyInfo.cs
+/home/chicles_fernan/Documentos/Modelado/Proyecto_1-Chat/src/cliente/ClienteChat/obj/Debug/net8.0/ClienteChat.csproj.CoreCompileInputs.cache
+/home/chicles_fernan/Documentos/Modelado/Proyecto_1-Chat/src/cliente/ClienteChat/obj/Debug/net8.0/ClienteChat.sourcelink.json
+/home/chicles_fernan/Documentos/Modelado/Proyecto_1-Chat/src/cliente/ClienteChat/bin/Debug/net8.0/ClienteChat
+/home/chicles_fernan/Documentos/Modelado/Proyecto_1-Chat/src/cliente/ClienteChat/bin/Debug/net8.0/ClienteChat.deps.json
+/home/chicles_fernan/Documentos/Modelado/Proyecto_1-Chat/src/cliente/ClienteChat/bin/Debug/net8.0/ClienteChat.runtimeconfig.json
+/home/chicles_fernan/Documentos/Modelado/Proyecto_1-Chat/src/cliente/ClienteChat/bin/Debug/net8.0/ClienteChat.dll
+/home/chicles_fernan/Documentos/Modelado/Proyecto_1-Chat/src/cliente/ClienteChat/bin/Debug/net8.0/ClienteChat.pdb
+/home/chicles_fernan/Documentos/Modelado/Proyecto_1-Chat/src/cliente/ClienteChat/obj/Debug/net8.0/ClienteChat.dll
+/home/chicles_fernan/Documentos/Modelado/Proyecto_1-Chat/src/cliente/ClienteChat/obj/Debug/net8.0/refint/ClienteChat.dll
+/home/chicles_fernan/Documentos/Modelado/Proyecto_1-Chat/src/cliente/ClienteChat/obj/Debug/net8.0/ClienteChat.pdb
+/home/chicles_fernan/Documentos/Modelado/Proyecto_1-Chat/src/cliente/ClienteChat/obj/Debug/net8.0/ClienteChat.genruntimeconfig.cache
+/home/chicles_fernan/Documentos/Modelado/Proyecto_1-Chat/src/cliente/ClienteChat/obj/Debug/net8.0/ref/ClienteChat.dll

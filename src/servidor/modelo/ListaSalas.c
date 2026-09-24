@@ -2,22 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
-#include "lista_clientes.h"
+#include "lista_salas.h"
 
 // Bueeeeeno, tocará hacer otra implementación de lista ligada simple, pero ahora para administrar las salas que haya en el servidor :v
-
-// Aquí definimos la estructura para los nodos de las salas
-typedef struct NodoSala{
-    char room_name[20]; // Aquí guardaremos el nombre de la sala
-    ListaClientes *usuarios; // Aquí guardaremos los usuarios que son miembros de la sala
-    struct NodoSala *siguiente; // Y aquí guardaremos la sala que le sigue a esta en la lista
-} NodoSala;
-
-// Ahora definiremos otra estructura que sirva como nuestra lista ligada simple (creo que me metí en un despapaye innecesario, verdad?)
-typedef struct ListaSalas{
-    NodoSala *cabeza; // Aquí guardaremos (como el nombre lo dice) la sala que es la actual cabeza de la lista
-    int num_salas; // Y aquí guardaremos el número que representa la cantidad de salas que hay actualmente
-} ListaSalas;
 
 // De nuevo, hacemos lo que sería el equivalente a un constructor en java para poder inicializar nuestra lista
 ListaSalas* crear_lista_salas(){ 

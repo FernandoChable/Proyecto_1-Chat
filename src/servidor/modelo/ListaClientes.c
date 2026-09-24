@@ -2,22 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include "lista_clientes.h"
 
 // Este programa existe más que nada para poder tener la estructura que se usará para los clientes y no saturar de código el programa del servidor
-
-// Aquí definimos la estructura para los nodos de los clientes
-typedef struct ClienteNodo{
-    int socket; // Guardaremos el socket del cliente
-    char username[10]; // Guardaremos su username (ponemos 20 de capacidad por si las moscas)
-    char status[7]; // Guardaremos su estado (solo ponemos de capacidad 6 porque el estado más largo es ACTIVE, dice 7 porque también se incluye el caracter nulo)
-    struct ClienteNodo *siguiente; // Y como es una lista ligada simple, guardamos su siguiente nodo
-} ClienteNodo;
-
-// Ahora definiremos otra estructura que sirva como nuestra lista ligada simple (te odio C)
-typedef struct ListaClientes{
-    ClienteNodo *cabeza; // Obviamente nuestra lista necesita una cabeza
-    int numClientes; // Esto nomas nos sirve para saber el tamaño de la lista
-} ListaClientes;
 
 // Ahora, haremos lo que sería el equivalente a un constructor en otros lenguajes para poder crear nuestra lista (Canek me va a matar x'd)
 ListaClientes* crear_lista() {

@@ -3,7 +3,7 @@
 
 typedef struct ClienteNodo {
     int socket;
-    char username[20];
+    char username[10];
     char status[7];
     struct ClienteNodo *siguiente;
 } ClienteNodo;

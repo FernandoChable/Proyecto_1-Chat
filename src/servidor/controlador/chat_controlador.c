@@ -1,86 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <netinet/in.h>
 #include <string.h>
-#include <strings.h>
-#include <pthread.h>
-#include <cjson/cJSON.h>
-#include "lista_clientes.h"
-#include "lista_salas.h"
-
-// Esta pequeña estructura existe para poder empaquetar los datos que necesitamos en el hilo de ejcución y ya xd
-typedef struct DatosHilo{
-    int socket;
-    ListaClientes *lista;
-    ListaSalas *lista_salas;
-} DatosHilo;
-
-// Definimos la función que va a ejecutar el hilo que atiende al cliente.
-void *atender_cliente(void *arg) {
-
-    // Primero vamos a recuperar nuestro DatosHilo
-    DatosHilo *datos = (DatosHilo*)arg;
-
-    int socket_cliente = datos->socket; // Obtenemos el socket del cliente
-    ListaClientes *lista = datos->lista; // Obtenemos la lista
-    ListaSalas *lista_salas = datos->lista_salas;
-
-    free(datos); // Liberamos la memoria que usamos para nuestro paquetito de datos
-
-    size_t tamano_buffer = 1048576; // Esto de aquí lo hice porque empezó a haber un error en el que los json se mostraban todos fragmentados
-
-    char *buffer = (char *)malloc(tamano_buffer); //Creamos un buffer para almacenar los datos enviados por el cliente. (ACTUALIZACIÓN: Cambié el tamaño de 1024 bytes a 1,048,576 para que sea de exatcamente 1mb)
-    if(buffer == NULL) {
-        printf("Error: No se puede asignar memoria en el buffer.");
-        close(socket_cliente);
-        return NULL;
-    }
-
-    while(1) {
-        // Limpiamos el buffer en cada iteración nueva
-        memset(buffer, 0, tamano_buffer);
-
-        // Lectura de datos
-        int new_read = read(socket_cliente, buffer, tamano_buffer); //Leemos los datos enviados por el cliente.
-        if(new_read < 0) { //Comprobamos si hubo algún error al leer los datos.
-            printf("Error al leer los datos\n");
-            break;
-        }
-        
-        printf("Datos recibidos del cliente: %s\n", buffer); //Imprimimos los datos para tener una referencia de que sí funciona xd.
-
-        cJSON *json = cJSON_Parse(buffer); // Convertimos los datos del cliente a un objeto JSON    
-
-        // Con esta función de aquí ya se manda cualquier cosa casi xd
-        identificar_tipo(json, socket_cliente, lista, lista_salas);
-
-        cJSON_Delete(json); // Liberamos la memoria del json
-    }
-
-    close(socket_cliente); //Cerramos el socket.
-    free(buffer); // Liberamos todo el buffer del cliente
-
-}
-
-// Aquí abajo voy a definir los métodos de las respuestas que vienen en el protocolo, para intentar tener todo un poco "organizado" (entre muchísimas comillas)
-
-// Esta siguiente función servirá para notificar cualquier JSON para todos los demás usuarios
-void notificar_usuarios(ListaClientes *lista, int socket_cliente, char *notif_str) {
-    ClienteNodo *actual = lista->cabeza;
-        while(actual != NULL) {
-            // Vamos a enviar el mensaje a los demás usuarios exceptuando al que se acaba de conectar (pues porque ni modo de decirle que acaba de entrar jeje)
-            if(actual->socket != socket_cliente) {
-                write(actual->socket, notif_str, strlen(notif_str));
-            }
-            actual = actual->siguiente;
-        }
-
-}
+#include "chat_controlador.h"
+#include "../vista/red_vista.h"
 
 // Este método lo usamos para identificar el tipo que viene en el JSON
-void identificar_tipo(cJSON *json, int socket_cliente, ListaClientes *lista, ListaSalas *lista_salas) {
+void identificar_tipo(cJSON *json, int socket_cliente, ListaClientes *lista_clientes, ListaSalas *lista_salas) {
     cJSON *type = cJSON_GetObjectItemCaseSensitive(json, "type"); // En type vamos a guardar el tipo de mensaje que mandó el cliente
 
     // Ahora aquí vamos a revisar cuál es el tipo para saber a qué otra función debe llamar esta función
@@ -89,35 +14,42 @@ void identificar_tipo(cJSON *json, int socket_cliente, ListaClientes *lista, Lis
 
         // En caso de que type sea IDENTIFY
         if(strcmp(type->valuestring, "IDENTIFY") == 0) {
-            identify(lista, socket_cliente, json);
+            identify(lista_clientes, socket_cliente, json);
         }
 
         // En caso de que type sea STATUS
         if(strcmp(type->valuestring, "STATUS") == 0) {
-            status(socket_cliente, json, lista);
+            status(socket_cliente, json, lista_clientes);
         }
 
         // En caso de que type sea USERS
         if(strcmp(type->valuestring, "USERS") == 0) {
-            users(socket_cliente, lista);
+            users(socket_cliente, lista_clientes);
         }
 
         // En caso de que sea type TEXT
         if(strcmp(type->valuestring, "TEXT") == 0) {
-            text(socket_cliente, json, lista);
+            text(socket_cliente, json, lista_clientes);
         }
 
         // En caso de que sea type PUBLIC_TEXT
         if(strcmp(type->valuestring, "PUBLIC_TEXT") == 0) {
-            publictext(socket_cliente, json, lista);
+            publictext(socket_cliente, json, lista_clientes);
         }
 
         // En caso de que sea type NEW_ROOM
         if(strcmp(type->valuestring, "NEW_ROOM") == 0) {
-            newroom(socket_cliente, json, lista_salas, lista);
+            newroom(socket_cliente, json, lista_salas, lista_clientes);
+        }
+
+        // En caso de que sea type INVITE
+        if(strcmp(type->valuestring, "INVITE") == 0) {
+            invite(socket_cliente, json, lista_salas, lista_clientes);
         }
     }
 }
+
+// Aquí ya van el resto de métodos individuales
 
 // Definición de:
 // IDENTIFY
@@ -126,13 +58,14 @@ void identify(ListaClientes *lista, int socket_cliente, cJSON *json) {
     cJSON *username = cJSON_GetObjectItemCaseSensitive(json, "username");
     cJSON *response = cJSON_CreateObject();
 
+    cJSON_AddStringToObject(response, "type", "RESPONSE");
+    cJSON_AddStringToObject(response, "operation", "IDENTIFY");
+
     // Aquí revisamos que el username no exista ya
     if(buscar_cliente(lista, username->valuestring) == 0) {
         insertar_cliente(lista, socket_cliente, username->valuestring, "ACTIVE");
 
         // Empezamos a formar todo el JSON de respuesta
-        cJSON_AddStringToObject(response, "type", "RESPONSE");
-        cJSON_AddStringToObject(response, "operation", "IDENTIFY");
         cJSON_AddStringToObject(response, "result", "SUCCESS");
         cJSON_AddStringToObject(response, "extra", username->valuestring);
 
@@ -141,33 +74,21 @@ void identify(ListaClientes *lista, int socket_cliente, cJSON *json) {
         cJSON_AddStringToObject(notif, "type", "NEW_USER");
         cJSON_AddStringToObject(notif, "username", username->valuestring);
 
-        // Luego lo convertimos a string
-        char *notif_str = cJSON_PrintUnformatted(notif);
-
         // Ahora mandamos el mensaje a todos los demás usuarios
-        notificar_usuarios(lista, socket_cliente, notif_str);
+        notificar_usuarios_vista(lista, socket_cliente, notif);
         
         // Luego liberamos memoria
         cJSON_Delete(notif);
-        free(notif_str);
     } else {
         // Aquí formamos el JSON de respuesta en caso de que ya exista el username
-        cJSON_AddStringToObject(response, "type", "RESPONSE");
-        cJSON_AddStringToObject(response, "operation", "IDENTIFY");
         cJSON_AddStringToObject(response, "result", "USER_ALREADY_EXISTS");
         cJSON_AddStringToObject(response, "extra", username->valuestring);
     }
 
-    char *response_str = cJSON_PrintUnformatted(response);
-
-    int new_write = write(socket_cliente, response_str, strlen(response_str)); //Enviamos los datos al cliente.
-    if(new_write < 0) { //Comprobamos si hubo algún error al enviar los datos.
-        printf("Error al enviar los datos\n");
-    }
+    enviar_json(socket_cliente, response);
 
     // Ahora liberamos toooda la memoria usada
     cJSON_Delete(response);
-    free(response_str);
 }
 
 // Definición de
@@ -196,23 +117,16 @@ void status(int socket_cliente, cJSON *json, ListaClientes *lista) {
                 cJSON_AddStringToObject(notif, "username", actual->username);
                 cJSON_AddStringToObject(notif, "status", nuevo_status);
 
-                char *notif_str = cJSON_PrintUnformatted(notif);
-
-                notificar_usuarios(lista, socket_cliente, notif_str);
+                notificar_usuarios_vista(lista, socket_cliente, notif);
 
                 // Liberamos la memoria utilizada
                 cJSON_Delete(notif);
-                free(notif_str);
-
                 return;
             }
         }
 
         actual = actual->siguiente;
     }
-
-    // Tecnicamente, si terminó el bucle, es porque el usuario no existe
-    printf("Error: El usuario cuyo estado quiere cambiar no se ha identificado");
 }
 
 // Definición de
@@ -237,16 +151,7 @@ void users(int socket_cliente, ListaClientes *lista) {
     cJSON_AddItemToObject(response, "users", user_list);
 
     // Lo mandamos al usuario que lo solicitó
-    char *response_str = cJSON_PrintUnformatted(response);
-
-    if(response_str != NULL) {
-        int new_write = write(socket_cliente, response_str, strlen(response_str));
-        if(new_write < 0) {
-            printf("Error al enviar los datos\n");
-        }
-
-        free(response_str);
-    }
+    enviar_json(socket_cliente, response);
 
     cJSON_Delete(response);
 }
@@ -290,15 +195,8 @@ void text(int socket_cliente, cJSON *json, ListaClientes *lista) {
         cJSON_AddStringToObject(notif, "text", message->valuestring);
 
         // Y ps lo mandamos
-        char *notif_str = cJSON_PrintUnformatted(notif);
+        enviar_json(socket_destino, notif);
 
-        int new_write = write(socket_destino, notif_str, strlen(notif_str));
-        if(new_write < 0) {
-            printf("Error al enciar los datos\n");
-        }
-
-        // Y ps ya liberamos la memoria usada
-        free(notif_str);
         cJSON_Delete(notif);
 
     } else { // En caso de que no exista, el servidor responderá
@@ -308,14 +206,8 @@ void text(int socket_cliente, cJSON *json, ListaClientes *lista) {
         cJSON_AddStringToObject(response, "result", "NO_SUCH_USER");
         cJSON_AddStringToObject(response, "extra", username->valuestring);
 
-        char *response_str = cJSON_PrintUnformatted(response);
+        enviar_json(socket_cliente, response);
 
-        int new_write = write(socket_cliente, response_str, strlen(response_str));
-        if(new_write < 0) {
-            printf("Error al enviar los datos\n");
-        }
-
-        free(response_str);
         cJSON_Delete(response);
     }
 }
@@ -347,10 +239,8 @@ void publictext(int socket_cliente, cJSON *json, ListaClientes *lista) {
         cJSON_AddStringToObject(notif, "text", message->valuestring);
 
         // Y se lo mandamos a todoooos (menos al usuario que lo mandó obvio xd)
-        char *notif_str = cJSON_PrintUnformatted(notif);
-        notificar_usuarios(lista, socket_cliente, notif_str);
+        notificar_usuarios_vista(lista, socket_cliente, notif);
 
-        free(notif_str);
         cJSON_Delete(notif);
     }
 }
@@ -398,89 +288,97 @@ void newroom(int socket_cliente, cJSON *json, ListaSalas *lista_salas, ListaClie
     }
 
     // Y lo mandamos
-    char *response_str = cJSON_PrintUnformatted(response);
+    enviar_json(socket_cliente, response);
 
-    if(response_str != NULL) {
-        int new_write = write(socket_cliente, response_str, strlen(response_str));
-        if(new_write < 0) {
-            printf("Error al enviar los datos\n");
-        }
-    }
-
-    free(response_str);
     cJSON_Delete(response);
 }
 
-// Aquí ya empezamos con el main del servidor.
-int main() {
+// Definición de
+// INVITE
+// :)
+void invite(int socket_cliente, cJSON *json, ListaSalas *lista_salas, ListaClientes *lista) {
+    cJSON *roomname = cJSON_GetObjectItemCaseSensitive(json, "roomname");
+    cJSON *usernames = cJSON_GetObjectItemCaseSensitive(json, "usernames");
 
-    // Primero creamos nuestra lista que contendrá a los clientes conectados E IDENTIFICADOS al servidor
-    ListaClientes *lista_clientes = crear_lista();
-
-    // Ahora creamos una lista que contendrá a las salas que se creen (por si acaso xd)
-    ListaSalas *lista_salas = crear_lista_salas();
-
-    /*
-    Créditos a SanjayRV con su articulo: https://dev.to/sanjayrv/a-beginners-guide-to-socket-programming-in-c-5an5
-    por el super paro que me tiró para poder hacer y entender cómo hacer un servidor con sockets en C, pues no tenía ni la menor idea de cómo hacerlo xd.
-    */
-
-    int server_fd = socket(AF_INET, SOCK_STREAM, 0); //Usamos AF_INET para IPv4 y SOCK_STREAM para TCP.
-    if(server_fd < 0) { //Comprobamos si hubo un error al crear el socket.
-        printf("Error al crear el socket\n");
-        exit(1);
-    };
-
-    printf("Se ha creado el socket con éxito: %d\n", server_fd); //Imprimimos en la terminal en caso de que se haya creado bien.
-
-    struct sockaddr_in my_addr;
-
-    bzero(&my_addr, sizeof(my_addr)); //Inicializamos la estructura my_addr en cero.
-
-    my_addr.sin_family = AF_INET; //Definimos a la familia de direcciones como IPv4.
-    my_addr.sin_port = htons(5100); //Asignamos el puerto 5100 al socket usando htons() para convertir el número del puerto a formato de red.
-    my_addr.sin_addr.s_addr = htonl(INADDR_ANY); //Asignamos la dirección IP del socket a INADDR_ANY para que acepte conexiones desde cualquier dirección IP.
-
-    int bind_result = bind(server_fd, (struct sockaddr*)&my_addr, sizeof(my_addr)); //Enlazamos el socket a la dirección IP y al puerto.
-    if(bind_result < 0) { //Comprobamos si hubo un error al enlazar el socket a la dirección IP y puerto.
-        printf("Error al hacer bind\n");
-        close(server_fd);
-        exit(1);
-    };
-
-    int listen_result = listen(server_fd, 5); //Hacemos que el socket escuche alguna conexión entrante.
-    if(listen_result < 0) { //Comprobamos si hubo algún error al poner el socket en modo de escucha.
-        printf("Error al hacer listen\n");
-        close(server_fd);
-        exit(1);
+    if(!cJSON_IsString(roomname) || !cJSON_IsArray(usernames)) {
+        return;
     }
 
-    printf("Servidor esperando conexiones en el puerto 5100...\n"); //Esto lo puse para corroborar que al menos hasta aquí funciona el servidor xd.
+    // Primero vamos a revisar que efectivamente existe la sala
+    if(buscar_sala(lista_salas, roomname->valuestring) == 0) {
+        // Si no existe, le notificaremos al usuario que puso una sala inexistente xd
+        cJSON *response = cJSON_CreateObject();
+        cJSON_AddStringToObject(response, "type", "RESPONSE");
+        cJSON_AddStringToObject(response, "operation", "INVITE");
+        cJSON_AddStringToObject(response, "result", "NO_SUCH_ROOM");
+        cJSON_AddStringToObject(response, "extra", roomname->valuestring);
 
-    // Este bucle sirve para que acepte varias conexiones y no se muera con la primera.
-    while(1) {
+        enviar_json(socket_cliente, response);
 
-        int new_socket = accept(server_fd, NULL, NULL); //Aceptamos la conexión entrante.
-        if(new_socket < 0) { //Comprobamos si hubo algún error al aceptar la conexión.
-            printf("Error al aceptar la conexión\n");
-            close(server_fd);
-            exit(1);
+        cJSON_Delete(response);
+        return;
+    }
+
+    // Ahora, vamos a verificar que todos los usuarios especificados en el arreglo sí existen
+    cJSON *user_item = NULL;
+    cJSON_ArrayForEach(user_item, usernames) {
+        if(cJSON_IsString(user_item) && user_item->valuestring != NULL) {
+            if(buscar_cliente(lista, user_item->valuestring) == 0) {
+                // Al detectar al primer usuario inexistente, respondemos que no existe
+                cJSON *response = cJSON_CreateObject();
+                cJSON_AddStringToObject(response, "type", "RESPONSE");
+                cJSON_AddStringToObject(response, "operation", "INVITE");
+                cJSON_AddStringToObject(response, "result", "NO_SUCH_USER");
+                cJSON_AddStringToObject(response, "extra", user_item->valuestring);
+
+                enviar_json(socket_cliente, response);
+
+                cJSON_Delete(response);
+                return;
+            }
+        }
+    }
+
+    // Ahora que ya sabemos que tanto la sala como los usuarios existen, vamos a obtener el nombre de usuario del que mandó la invitación
+    ClienteNodo *actual = lista->cabeza;
+    char *emisor;
+    while(actual != NULL) {
+        if(actual->socket == socket_cliente) {
+            emisor = actual->username;
+        }
+        actual = actual->siguiente;
+    }
+
+    // Y por último vamos a mandar todas las invitaciones
+    NodoSala *sala = obtener_sala(lista_salas, roomname->valuestring);
+
+    cJSON_ArrayForEach(user_item, usernames) {
+        // Si el usuario ya está en la sala simplemente lo vamos a ignorar
+        if(sala != NULL && buscar_cliente(sala->usuarios, user_item->valuestring) == 1) {
+            continue;
         }
 
-        // A continuación , guardaremos un espacio de memoria para poder desempaquetar el paquetito de datos que tiene el socket y la lista de clientes (la del mero inicio)
-        DatosHilo *datos = (DatosHilo *)malloc(sizeof(DatosHilo));
-        datos->socket = new_socket; // Asociamos el socket del cliente
-        datos->lista = lista_clientes; // Asociamos la lista de clientes (nos servirá para algunas funciones)
-        datos->lista_salas = lista_salas; // Asociamos la lista de salas (igual, nos servirá para algunas funciones)
+        // Vamos ahora a buscar el socket del usuario al que se quiere invitar
+        int socket_destino = -1;
+        ClienteNodo *actual_destino = lista->cabeza;
+        while(actual_destino != NULL) {
+            if(strcmp(user_item->valuestring, actual_destino->username) == 0) {
+                socket_destino = actual_destino->socket;
+                break;
+            }
 
-        pthread_t thread_id; // Creamos un identificador para el hilo de ejecución.
+            actual_destino = actual_destino->siguiente;
+        }
 
-        // Ahora creamos un hilo de ejecución para atender a ese cliente.
-        pthread_create(&thread_id, NULL, atender_cliente, (void*)datos);
+        // Y por último vamos a mandarle la invitación al usuario
+        if(socket_destino != -1) {
+            cJSON *notif = cJSON_CreateObject();
+            cJSON_AddStringToObject(notif, "type", "INVITATION");
+            cJSON_AddStringToObject(notif, "username", emisor);
+            cJSON_AddStringToObject(notif, "roomname", sala);
 
-        printf("Se ha conectado un nuevo cliente\n");
-
+            enviar_json(socket_destino, notif);
+            cJSON_Delete(notif);
+        }
     }
-
-    return 0;
 }
