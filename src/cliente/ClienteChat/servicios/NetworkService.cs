@@ -9,10 +9,10 @@ namespace ClienteChat.servicios
 {
     public class NetworkService
     {
-        private TcpClient _client; // Esto abre la conexión TCP entre el cliente y el servidor
-        private NetworkStream _stream; // Esto es un flujo de transporte por donde pasan los datos entre ambos extremos
-        private StreamReader _reader; // Esto y el _writer convierten los bytes que viajan por el _stream en texto UTF-8
-        private StreamWriter _writer;
+        private TcpClient? _client; // Esto abre la conexión TCP entre el cliente y el servidor
+        private NetworkStream? _stream; // Esto es un flujo de transporte por donde pasan los datos entre ambos extremos
+        private StreamReader? _reader; // Esto y el _writer convierten los bytes que viajan por el _stream en texto UTF-8
+        private StreamWriter? _writer;
 
         public event Action<string>? OnMessageReceived; // Este evento solo notifica cuando recibe un mensaje
         public event Action? OnDisconnected; // Este evento solo notifica cuando el servidor se desconectó por X o Y razón
@@ -30,7 +30,7 @@ namespace ClienteChat.servicios
                 // Aquí iniciamos un hilo de ejecución secundario que se va a encargar de escuchar al servidor si manda un mensaje en cualquier momento
                 Task.Run(EscucharServidor);
                 return true;
-            } catch (Exception e)
+            } catch (Exception)
             {
                 return false;
             }

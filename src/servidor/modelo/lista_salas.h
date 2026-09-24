@@ -5,6 +5,7 @@
 typedef struct NodoSala {
     char room_name[20];
     ListaClientes *usuarios;
+    ListaClientes *invitados;
     struct NodoSala *siguiente;
 } NodoSala;
 

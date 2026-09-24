@@ -23,6 +23,7 @@ void insertar_sala(ListaSalas *lista, const char *room_name) {
     strncpy(nueva_sala->room_name, room_name, sizeof(nueva_sala->room_name) - 1); // Asignamos el nombre de la sala (de nuevo, el -1 es para dejar un espacio para el caracter nulo)
     nueva_sala->room_name[sizeof(nueva_sala->room_name) - 1] = '\0';
     nueva_sala->usuarios = crear_lista();
+    nueva_sala->invitados = crear_lista();
 
     // Aquí añadimos la nueva sala a la lista
     nueva_sala->siguiente = lista->cabeza;

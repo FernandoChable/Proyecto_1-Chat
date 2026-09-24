@@ -47,7 +47,7 @@ namespace ClienteChat.vista
         public string? LeerEntrada()
         {
             Console.Write("> ");
-            string entrada = Console.ReadLine();
+            string entrada = Console.ReadLine() ?? "";
             return entrada;
         }
     }

@@ -46,6 +46,16 @@ void identificar_tipo(cJSON *json, int socket_cliente, ListaClientes *lista_clie
         if(strcmp(type->valuestring, "INVITE") == 0) {
             invite(socket_cliente, json, lista_salas, lista_clientes);
         }
+
+        // En caso de que sea type JOIN_ROOM
+        if(strcmp(type->valuestring, "JOIN_ROOM") == 0) {
+            joinroom(socket_cliente, json, lista_salas, lista_clientes);
+        }
+
+        // En caso de que sea type ROOM_USERS
+        if(strcmp(type->valuestring, "ROOM_USERS") == 0) {
+            roomusers(socket_cliente, json, lista_salas, lista_clientes);
+        }
     }
 }
 
@@ -370,15 +380,203 @@ void invite(int socket_cliente, cJSON *json, ListaSalas *lista_salas, ListaClien
             actual_destino = actual_destino->siguiente;
         }
 
+        // Ahora vamos a obtener el estado del usuario al que se quiere invitar
+        char *status;
+        while(actual_destino != NULL) {
+            if(strcmp(user_item->valuestring, actual_destino->username) == 0) {
+                status = actual_destino->status;
+                break;
+            }
+
+            actual_destino = actual_destino->siguiente;
+        }
+
+        // Vamos a añadir al usuario a la lista de invitados
+        insertar_cliente(sala->invitados, socket_destino, user_item->valuestring, status);
+
         // Y por último vamos a mandarle la invitación al usuario
         if(socket_destino != -1) {
             cJSON *notif = cJSON_CreateObject();
             cJSON_AddStringToObject(notif, "type", "INVITATION");
             cJSON_AddStringToObject(notif, "username", emisor);
-            cJSON_AddStringToObject(notif, "roomname", sala);
+            cJSON_AddStringToObject(notif, "roomname", sala->room_name);
 
             enviar_json(socket_destino, notif);
             cJSON_Delete(notif);
         }
     }
+}
+
+// Definición de
+// JOIN_ROOM
+// :)
+void joinroom(int socket_cliente, cJSON *json, ListaSalas *lista_salas, ListaClientes *lista) {
+    cJSON *roomname = cJSON_GetObjectItemCaseSensitive(json, "roomname");
+
+    // Verificamos por si acaso que el json no sea nulo
+    if(!cJSON_IsString(roomname) || roomname->valuestring == NULL) {
+        return;
+    }
+
+    // Antes de cualquier cosa, vamos a revisar que la sala realmente existe
+    if(buscar_sala(lista_salas, roomname->valuestring) == 0) {
+        // Le notificamos al usuario que la sala que puso no existe
+        cJSON *response = cJSON_CreateObject();
+        cJSON_AddStringToObject(response, "type", "RESPONSE");
+        cJSON_AddStringToObject(response, "operation", "JOIN_ROOM");
+        cJSON_AddStringToObject(response, "result", "NO_SUCH_ROOM");
+        cJSON_AddStringToObject(response, "extra", roomname->valuestring);
+
+        enviar_json(socket_cliente, response);
+
+        cJSON_Delete(response);
+        return;
+    }
+
+    // Vamos a guardar la dirección de la sala
+    NodoSala *room = obtener_sala(lista_salas, roomname->valuestring);
+
+    // Y vamos a guardar el nombre del usuario que se quiere meter
+    ClienteNodo *actual = lista->cabeza;
+    char *username;
+    char *status;
+    while(actual != NULL) {
+        if(actual->socket == socket_cliente) {
+            username = actual->username;
+            status = actual->status;
+            break;
+        }
+
+        actual = actual->siguiente;
+    }
+
+    // Luego, vamos a revisar que el usuario no esté ya en la sala, en caso de que sí simplemente no hace nada
+    if(buscar_cliente(room->usuarios, username) == 1) {
+        // No hacemos nada xd
+        return;
+    }
+
+    // Y la última comprobación, es para ver que efectivamente invitaron al usuario que se quiere unir
+    if(buscar_cliente(room->invitados, username) == 0) {
+        // Le notificamos al usuario que no ha sido invitado (pobre chaval)
+        cJSON *response = cJSON_CreateObject();
+        cJSON_AddStringToObject(response, "type", "RESPONSE");
+        cJSON_AddStringToObject(response, "operation", "JOIN_ROOM");
+        cJSON_AddStringToObject(response, "result", "NOT_INVITED");
+        cJSON_AddStringToObject(response, "extra", roomname->valuestring);
+
+        enviar_json(socket_cliente, response);
+
+        cJSON_Delete(response);
+        return;
+    }
+
+    // Ya que comprobamos todo, vamos a meterlo a la sala y eliminarlo de la lista de invitados
+    insertar_cliente(room->usuarios, socket_cliente, username, status);
+    eliminar_cliente(room->invitados, socket_cliente);
+
+    // Y le notificamos al usuario que se unió exitosamente
+    cJSON *response = cJSON_CreateObject();
+    cJSON_AddStringToObject(response, "type", "RESPONSE");
+    cJSON_AddStringToObject(response, "operation", "JOIN_ROOM");
+    cJSON_AddStringToObject(response, "result", "SUCCESS");
+    cJSON_AddStringToObject(response, "extra", roomname->valuestring);
+
+    enviar_json(socket_cliente, response);
+
+    // Además, hay que notificar a los demás usuarios de que alguien nuevo llegó a la sala (juguetes nuevooooos)
+    cJSON *notif = cJSON_CreateObject();
+    cJSON_AddStringToObject(notif, "type", "JOINED_ROOM");
+    cJSON_AddStringToObject(notif, "roomname", roomname->valuestring);
+    cJSON_AddStringToObject(notif, "username", username);
+
+    notificar_usuarios_vista(room->usuarios, socket_cliente, notif);
+
+    // Y liberamos memoria
+    cJSON_Delete(response);
+    cJSON_Delete(notif);
+}
+
+// Definición de
+// ROOM_USERS
+// :)
+void roomusers(int socket_cliente, cJSON *json, ListaSalas *lista_salas, ListaClientes *lista) {
+    cJSON *roomname = cJSON_GetObjectItemCaseSensitive(json, "roomname");
+
+    // Verificamos por si acaso que el json no sea nulo
+    if(!cJSON_IsString(roomname) || roomname->valuestring == NULL) {
+        return;
+    }
+
+    // Ahora verificamos que la sala efectivamente existe
+    if(buscar_sala(lista_salas, roomname->valuestring) == 0) {
+        // Si no existe, le notificamos al usuario eso mismo
+        cJSON *response = cJSON_CreateObject();
+        cJSON_AddStringToObject(response, "type", "RESPONSE");
+        cJSON_AddStringToObject(response, "operation", "ROOM_USERS");
+        cJSON_AddStringToObject(response, "result", "NO_SUCH_ROOM");
+        cJSON_AddStringToObject(response, "extra", roomname->valuestring);
+
+        enviar_json(socket_cliente, response);
+
+        cJSON_Delete(response);
+        return;
+    }
+
+    // Ahora, vamos a obtener la dirección de la sala (nos servirá más adelante)
+    NodoSala *room = obtener_sala(lista_salas, roomname->valuestring);
+
+    // Luego, vamos a obtener el nombre del usuario (nos servirá más adelante)
+    ClienteNodo *actual = lista->cabeza;
+    char *username;
+    while(actual != NULL) {
+        if(actual->socket == socket_cliente) {
+            username = actual->username;
+            break;
+        }
+
+        actual = actual->siguiente;
+    }
+
+    // Y ahora, vamos a verificar que el usuario sí esté en la sala
+    if(buscar_cliente(room->usuarios, username) == 0) {
+        // Si no está, le notificamos al usuario
+        cJSON *response = cJSON_CreateObject();
+        cJSON_AddStringToObject(response, "type", "RESPONSE");
+        cJSON_AddStringToObject(response, "operation", "ROOM_USERS");
+        cJSON_AddStringToObject(response, "result", "NOT_JOINED");
+        cJSON_AddStringToObject(response, "extra", roomname->valuestring);
+
+        enviar_json(socket_cliente, response);
+
+        cJSON_Delete(response);
+        return;
+    }
+
+    // Ya que terminamos nuestras verificaciones, ahora sí podemos mandarle el JSON al controlador del usuario
+    // Nota: Es básicamente un copia y pega de USERS, solo que no usé ese método aquí por el type del JSON
+    cJSON *response = cJSON_CreateObject();
+    cJSON_AddStringToObject(response, "type", "ROOM_USER_LIST");
+
+    // Ahora vamos a crear un JSON que almacenará toooooda la lista de usuarios
+    cJSON *user_list = cJSON_CreateObject();
+
+    // Y ahora vamos a recorrer toda la lista de usuarios para poder añadirlos a la lista
+    ClienteNodo *actual_sala = room->usuarios->cabeza;
+    while(actual_sala != NULL) {
+        cJSON_AddStringToObject(user_list, actual_sala->username, actual_sala->status);
+        actual_sala = actual_sala->siguiente;
+    }
+
+    // Especificamos el nombre de la sala
+    cJSON_AddStringToObject(response, "roomname", roomname->valuestring);
+
+    // Metemos la lista de usuarios al JSON
+    cJSON_AddItemToObject(response, "users", user_list);
+
+    // Lo mandamos al usuario que lo solicitó
+    enviar_json(socket_cliente, response);
+
+    cJSON_Delete(response);
+
 }

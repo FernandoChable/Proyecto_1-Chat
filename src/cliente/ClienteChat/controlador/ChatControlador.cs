@@ -82,6 +82,21 @@ namespace ClienteChat.controlador
                 case "/new_room":
                     NewRoom(argumento);
                     break;
+                
+                // El comando es INVITE
+                case "/invite":
+                    Invite(argumento);
+                    break;
+
+                // El comando es JOIN_ROOM
+                case "/join_room":
+                    JoinRoom(argumento);
+                    break;
+
+                // El comando es ROOM_USERS
+                case "/room_users":
+                    RoomUsers(argumento);
+                    break;
 
                 default:
                 _view.MostrarError($"Introduzca un comando válido ({comando} no lo es).");
@@ -243,6 +258,103 @@ namespace ClienteChat.controlador
             }
         }
 
+        // Definición de
+        // INVITE (del lado del cliente)
+        // :)
+        public void Invite(String entrada)
+        {
+            // Primero verificamos que no falte información importante
+            if(string.IsNullOrWhiteSpace(entrada))
+            {
+                _view.MostrarError("Falta información. Uso correcto (la sala debe estar entre comillas): /invite <sala> <usuarios_a_invitar>");
+                return;
+            }
+
+            // Primero vamos a partir la entrada usando comillas porque el nombre de la sala debe estar entre comillas
+            string[] partes = entrada.Split('"');
+
+            if(partes.Length < 3)
+            {
+                _view.MostrarError("Formato de comillas incorrecto. Uso correcto (la sala debe estar entre comillas): /invite <sala> <usuarios_a_invitar>");
+                return;
+            }
+
+            string room_name = partes[1].Trim();
+            string[] usuariosAEnviar = partes[2].Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+            // Vamos a verificar rápido que por lo menos haya un usuario
+            if(usuariosAEnviar.Length == 0)
+            {
+                _view.MostrarError("Debes proporcionar usuarios para invitar. Uso correcto (la sala debe estar entre comillas): /invite <sala> <usuarios_a_invitar>");
+                return;
+            }
+
+            // Como ya verificamos que sí hay usuarios para invitar, hacemos un arreglo para almacenarlos
+            var usernames = new JsonArray();
+
+            for(int i = 0; i < usuariosAEnviar.Length; i++)
+            {
+                usernames.Add(usuariosAEnviar[i]);
+            }
+
+            // Por último, hacemos el JSON para mandarlo al servidor
+            var invite_json = new JsonObject();
+
+            invite_json["type"] = "INVITE";
+            invite_json["roomname"] = room_name;
+            invite_json["usernames"] = usernames;
+
+            // Van siete veces que convertimos un json a string xd
+            string json_texto = invite_json.ToJsonString();
+            _networkService.Enviar(json_texto);
+        }
+
+        // Definición de
+        // JOIN_ROOM
+        // :)
+        public void JoinRoom(String roomname)
+        {
+            // De nuevo verificamos que no falte información importante
+            if(string.IsNullOrWhiteSpace(roomname))
+            {
+                _view.MostrarError("Falta información. Uso correcto: /join_room <sala>");
+                return;
+            }
+
+            // La ventaja aquí es que, como la entrada es el nombre de la sala, no hay que partir nada
+            var join_json = new JsonObject();
+
+            join_json["type"] = "JOIN_ROOM";
+            join_json["roomname"] = roomname;
+
+            // Ocho veces mandando jsons siiiii
+            string json_texto = join_json.ToJsonString();
+            _networkService.Enviar(json_texto);
+        }
+
+        // Definición de
+        // ROOM_USERS (del lado del cliente)
+        // :)
+        public void RoomUsers(String roomname)
+        {
+            // Otra vez verificamos que no falte información importante
+            if(string.IsNullOrWhiteSpace(roomname))
+            {
+                _view.MostrarError("Falta información. Uso correcto: /room_users <sala>");
+                return;
+            }
+
+            // Igual que con join_room, como solo es el nombre de la sala no hay que partir nada :D
+            var room_users_json = new JsonObject();
+
+            room_users_json["type"] = "ROOM_USERS";
+            room_users_json["roomname"] = roomname;
+
+            // VAN NUEVE veces que mandamos el json :D
+            string json_texto = room_users_json.ToJsonString();
+            _networkService.Enviar(json_texto);
+        }
+
         // Ya estos métodos de aquí abajo sirve para escuchar las respuestas del servidor
 
         // Este método de aquí va a procesar los mensajes del servidor
@@ -257,14 +369,14 @@ namespace ClienteChat.controlador
                 // Hacemos una pequeña comprobación por seguridad, en el mero caso de que no haya un "type" en el JSON
                 if(raiz.TryGetProperty("type", out var type))
                 {
-                    string tipo = type.GetString();
+                    string tipo = type.GetString() ?? "";
 
                     // En caso de que sea una respuesta
                     if(tipo == "RESPONSE")
                     {
                         // Guardamos la operación que se hizo y el resultado de la misma
-                        string operation = raiz.GetProperty("operation").GetString();
-                        string result = raiz.GetProperty("result").GetString();
+                        string operation = raiz.GetProperty("operation").GetString() ?? "";
+                        string result = raiz.GetProperty("result").GetString() ?? "";
 
                         if(result == "SUCCESS")
                         {
@@ -280,13 +392,13 @@ namespace ClienteChat.controlador
                     }
                     else if(tipo == "NEW_USER") // En caso de que sea una notificación de un nuevo usuario
                     {
-                        string user = raiz.GetProperty("username").GetString();
+                        string user = raiz.GetProperty("username").GetString() ?? "Anónimo";
                         _view.MostrarInformacion($"[Notificación]: {user} se ha conectado. ¡Dí hola!");
                     }
                     else if(tipo == "NEW_STATUS") // En caso de que sea una notificación de un nuevo estado de un usuario
                     {
-                        string user = raiz.GetProperty("username").GetString();
-                        string status = raiz.GetProperty("status").GetString();
+                        string user = raiz.GetProperty("username").GetString() ?? "Anónimo";
+                        string status = raiz.GetProperty("status").GetString() ?? "";
                         _view.MostrarInformacion($"[Notificación]: {user} ahora está {status}");
                     } 
                     else if(tipo == "USER_LIST") // En caso de que se haya solicitado la lista de usuarios
@@ -300,11 +412,41 @@ namespace ClienteChat.controlador
                             }
                         }
                     }
-                    else if(tipo == "TEXT_FROM" || tipo == "PUBLIC_TEXT_FROM") // En caso de que sea un mensaje privado o público
+                    else if(tipo == "TEXT_FROM") // En caso de que sea un mensaje privado
                     {
-                        string emisor = raiz.GetProperty("username").GetString();
-                        string message = raiz.GetProperty("text").GetString();
-                        _view.MostrarMensaje($"[{emisor}]: {message}");
+                        string emisor = raiz.GetProperty("username").GetString() ?? "Anónimo";
+                        string message = raiz.GetProperty("text").GetString() ?? "";
+                        _view.MostrarMensaje($"[Privado de: {emisor}]: {message}");
+                    }
+                    else if(tipo == "PUBLIC_TEXT_FROM"){
+                        string emisor = raiz.GetProperty("username").GetString() ?? "Anónimo";
+                        string message = raiz.GetProperty("text").GetString() ?? "";
+                        _view.MostrarMensaje($"[Público de: {emisor}]: {message}");
+                    }
+                    else if(tipo == "INVITATION") // En caso de que sea una invitación
+                    {
+                        string emisor = raiz.GetProperty("username").GetString() ?? "Anónimo";
+                        string roomname = raiz.GetProperty("roomname").GetString() ?? "";
+                        _view.MostrarInformacion($"[Notificación]: ¡{emisor} te está invitando a la sala {roomname}!");
+                    }
+                    else if(tipo == "JOINED_ROOM") // En caso de que se haya aceptado la invitación
+                    {
+                        string user = raiz.GetProperty("username").GetString() ?? "Anónimo";
+                        string roomname = raiz.GetProperty("roomname").GetString() ?? "";
+                        _view.MostrarInformacion($"[Notificación]: ¡{user} acaba de entrar a {roomname}!");
+                    }
+                    else if(tipo == "ROOM_USER_LIST") // En caso de que se haya solicitado la lista de usuarios de una sala
+                    {
+                        string roomname = raiz.GetProperty("roomname").GetString() ?? "";
+
+                        _view.MostrarInformacion($"--- Lista de Usuarios Conectados en {roomname} ---");
+                        if (raiz.TryGetProperty("users", out var users))
+                        {
+                            foreach (var userProp in users.EnumerateObject())
+                            {
+                                _view.MostrarMensaje($" • {userProp.Name} -> [{userProp.Value.GetString()}]");
+                            }
+                        }
                     }
                     else
                     {
