@@ -98,6 +98,16 @@ namespace ClienteChat.controlador
                     RoomUsers(argumento);
                     break;
 
+                // El comando es ROOM_TEXT
+                case "/room_text":
+                    RoomText(argumento);
+                    break;
+                
+                // El comando es LEAVE_ROOM
+                case "/leave_room":
+                    LeaveRoom(argumento);
+                    break;
+
                 default:
                 _view.MostrarError($"Introduzca un comando válido ({comando} no lo es).");
                 break;
@@ -355,6 +365,70 @@ namespace ClienteChat.controlador
             _networkService.Enviar(json_texto);
         }
 
+        // Definición de
+        // ROOM_TEXT (del lado del cliente)
+        // :)
+        public void RoomText(String entrada)
+        {
+            // Primero verificamos que la entrada no esté vacía
+            if(string.IsNullOrWhiteSpace(entrada))
+            {
+                _view.MostrarError("Falta información. Uso correcto (la sala debe estar entre comillas): /room_text <sala> <mensaje_a_enviar");
+                return;
+            }
+
+            // A diferencia de los métodos pasados, ahora sí hay que partir la entrada tomando en cuenta las comillas
+            string[] partes = entrada.Split('"', 3);
+
+            // Vamos a verificar que al menos haya un mensaje
+            if(partes.Length < 3)
+            {
+                _view.MostrarError("Falta un mensaje: Uso correcto (la sala debe estar entre comillas): /room_text <sala> <mensaje_a_enviar");
+                return;
+            }
+
+            // Ya podemos empezar a crear variables y JSON
+            string roomname = partes[1].Trim();
+            string message = partes[2].Trim();
+
+            var room_text_json = new JsonObject();
+
+            room_text_json["type"] = "ROOM_TEXT";
+            room_text_json["roomname"] = roomname;
+            room_text_json["text"] = message;
+
+            // Mandamos el JSON una décima vez :D
+            string json_texto = room_text_json.ToJsonString();
+            _networkService.Enviar(json_texto);
+        }
+
+        // Definición de
+        // LEAVE_ROOM (del lado del cliente)
+        // :)
+        public void LeaveRoom(String roomname)
+        {
+            // Primero verificamos que la entrada no esté vacía
+            if (string.IsNullOrWhiteSpace(roomname))
+            {
+                _view.MostrarError("Falta el nombre de la sala. Uso correcto: /leave_room <sala>");
+                return;
+            }
+
+            // Y ahora a diferencia del método anterior, no hace falta dividir la entrada
+            var leave_json = new JsonObject();
+
+            leave_json["type"] = "LEAVE_ROOM";
+            leave_json["roomname"] = roomname;
+
+            // Mandamos por decimo primera vez el JSON :D
+            string json_texto = leave_json.ToJsonString();
+            _networkService.Enviar(json_texto);
+        }
+
+        // Definición de
+        // DISCONNECT
+        // :D (YA ES EL ULTIMOOOOO)
+
         // Ya estos métodos de aquí abajo sirve para escuchar las respuestas del servidor
 
         // Este método de aquí va a procesar los mensajes del servidor
@@ -447,6 +521,21 @@ namespace ClienteChat.controlador
                                 _view.MostrarMensaje($" • {userProp.Name} -> [{userProp.Value.GetString()}]");
                             }
                         }
+                    } 
+                    else if(tipo == "ROOM_TEXT_FROM") // En caso de que se haya mandado un mensaje a un cuarto
+                    {
+                        string roomname = raiz.GetProperty("roomname").GetString() ?? "";
+                        string emisor = raiz.GetProperty("username").GetString() ?? "Anónimo";
+                        string message = raiz.GetProperty("text").GetString() ?? "";
+
+                        _view.MostrarMensajeSala($"[{emisor} desde {roomname}]: {message}");
+                    }
+                    else if(tipo == "LEFT_ROOM")
+                    {
+                        string roomname = raiz.GetProperty("roomname").GetString() ?? "";
+                        string user = raiz.GetProperty("username").GetString() ?? "Anónimo";
+
+                        _view.MostrarMensajeSala($"[{roomname}]: {user} ha dejado la sala :(");
                     }
                     else
                     {

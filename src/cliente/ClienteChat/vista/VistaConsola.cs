@@ -19,6 +19,18 @@ namespace ClienteChat.vista
             }
         }
 
+        // Este método de aquí mostrará en la terminal el mensaje que haya llegado desde una sala en específico
+        public void MostrarMensajeSala(string mensaje)
+        {
+            lock(_lockconsole)
+            {
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine(mensaje);
+                Console.ResetColor();
+                Console.Write("> ");
+            }
+        }
+
         // Este método de aquí mostrará algún error que se presente
         public void MostrarError(string error)
         {
@@ -27,7 +39,6 @@ namespace ClienteChat.vista
                 Console.ForegroundColor = ConsoleColor.Red; // Vamos a dejar el color rojo exclusivo para los errores
                 Console.WriteLine($"---ERROR--- : {error}");
                 Console.ResetColor(); // Reiniciamos el color de la terminal xd
-                Console.Write("> ");
             }
         }
 

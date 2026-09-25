@@ -56,6 +56,16 @@ void identificar_tipo(cJSON *json, int socket_cliente, ListaClientes *lista_clie
         if(strcmp(type->valuestring, "ROOM_USERS") == 0) {
             roomusers(socket_cliente, json, lista_salas, lista_clientes);
         }
+
+        // En caso de que sea type ROOM_TEXT
+        if(strcmp(type->valuestring, "ROOM_TEXT") == 0) {
+            roomtext(socket_cliente, json, lista_salas, lista_clientes);
+        }
+
+        // En caso de que sea type LEAVE_ROOM
+        if(strcmp(type->valuestring, "LEAVE_ROOM") == 0) {
+            leaveroom(socket_cliente, json, lista_salas, lista_clientes);
+        }
     }
 }
 
@@ -579,4 +589,153 @@ void roomusers(int socket_cliente, cJSON *json, ListaSalas *lista_salas, ListaCl
 
     cJSON_Delete(response);
 
+}
+
+// Definición de
+// ROOM_TEXT
+// :)
+void roomtext(int socket_cliente, cJSON *json, ListaSalas *lista_salas, ListaClientes *lista) {
+    cJSON *roomname = cJSON_GetObjectItemCaseSensitive(json, "roomname");
+    cJSON *message = cJSON_GetObjectItemCaseSensitive(json, "text");
+
+    // Verificamos por si acaso que el json no sea nulo
+    if(!cJSON_IsString(roomname) || roomname->valuestring == NULL || !cJSON_IsString(message) || message->valuestring == NULL) {
+        return;
+    }
+
+    // Primero vamos a verificar que sí existe la sala a la que se le quiere mandar el mensaje
+    if(buscar_sala(lista_salas, roomname->valuestring) == 0) {
+        // Si no existe la sala, le responderá al usuario eso mismo
+        cJSON *response = cJSON_CreateObject();
+        cJSON_AddStringToObject(response, "type", "RESPONSE");
+        cJSON_AddStringToObject(response, "operation", "ROOM_TEXT");
+        cJSON_AddStringToObject(response, "result", "NO_SUCH_ROOM");
+        cJSON_AddStringToObject(response, "extra", roomname->valuestring);
+
+        enviar_json(socket_cliente, response);
+        
+        cJSON_Delete(response);
+        return;
+    }
+    
+    // Ahora que sabemos que la sala existe, hay que ver si el usuario pertenece a la misma
+    // Primero obtenemos su nombre de usuario
+    ClienteNodo *actual = lista->cabeza;
+    char *username;
+    while(actual != NULL) {
+        if(actual->socket == socket_cliente) {
+            username = actual->username;
+        }
+
+        actual = actual->siguiente;
+    }
+
+    // Luego obtenemos la sala
+    NodoSala *room = obtener_sala(lista_salas, roomname->valuestring);
+
+    // Y ahora sí vemos si está en la sala o no
+    if(buscar_cliente(room->usuarios, username) == 0) {
+        // Si no está en la sala, se lo notificamos al usuario
+        cJSON *response = cJSON_CreateObject();
+        cJSON_AddStringToObject(response, "type", "RESPONSE");
+        cJSON_AddStringToObject(response, "operation", "ROOM_TEXT");
+        cJSON_AddStringToObject(response, "result", "NOT_JOINED");
+        cJSON_AddStringToObject(response, "extra", roomname->valuestring);
+
+        enviar_json(socket_cliente, response);
+
+        cJSON_Delete(response);
+        return;
+    }
+
+    // Ya que hicimos nuestras comprobaciones, ahora sí vamos a mandar el mensaje a todos
+    cJSON *notif = cJSON_CreateObject();
+    cJSON_AddStringToObject(notif, "type", "ROOM_TEXT_FROM");
+    cJSON_AddStringToObject(notif, "roomname", roomname->valuestring);
+    cJSON_AddStringToObject(notif, "username", username);
+    cJSON_AddStringToObject(notif, "text", message->valuestring);
+
+    // Y mandamos el JSON
+    notificar_usuarios_vista(room->usuarios, socket_cliente, notif);
+
+    // Y liberamos memoria
+    cJSON_Delete(notif);
+}
+
+// Definición de
+// LEAVE_ROOM
+// :)
+void leaveroom(int socket_cliente, cJSON *json, ListaSalas *lista_salas, ListaClientes *lista) {
+    cJSON *roomname = cJSON_GetObjectItemCaseSensitive(json, "roomname");
+
+    // Verificamos por si acaso que el json no sea nulo
+    if(!cJSON_IsString(roomname) || roomname->valuestring == NULL) {
+        return;
+    }
+
+    // Primero, revisamos que la sala sí exista
+    if(buscar_sala(lista_salas, roomname->valuestring) == 0) {
+        // Si no existe la sala pues se lo notificamos al usuario
+        cJSON *response = cJSON_CreateObject();
+
+        cJSON_AddStringToObject(response, "type", "RESPONSE");
+        cJSON_AddStringToObject(response, "operation", "LEAVE_ROOM");
+        cJSON_AddStringToObject(response, "result", "NO_SUCH_ROOM");
+        cJSON_AddStringToObject(response, "extra", roomname->valuestring);
+
+        enviar_json(socket_cliente, response);
+
+        cJSON_Delete(response);
+        return;
+    }
+
+    // Ahora, vamos a obtener tanto la sala como el nombre de usuario del que quiere salir
+    // Primero obtenemos el nombre de usuario
+    ClienteNodo *actual = lista->cabeza;
+    char *username = NULL;
+    while(actual != NULL) {
+        if(actual->socket == socket_cliente) {
+            username = actual->username;
+        }
+
+        actual = actual->siguiente;
+    }
+
+    // Luego obtenemos la sala
+    NodoSala *room = obtener_sala(lista_salas, roomname->valuestring);
+
+    // Aprovechando el nombre de usuario, revisamos que el usuario sí esté en la sala
+    if(buscar_cliente(room->usuarios, username) == 0) {
+        // Si no está pues le notificamos al usuario
+        cJSON *response = cJSON_CreateObject();
+
+        cJSON_AddStringToObject(response, "type", "RESPONSE");
+        cJSON_AddStringToObject(response, "operation", "LEAVE_ROOM");
+        cJSON_AddStringToObject(response, "result", "NOT_JOINED");
+        cJSON_AddStringToObject(response, "extra", roomname->valuestring);
+
+        enviar_json(socket_cliente, response);
+
+        cJSON_Delete(response);
+        return;
+    }
+
+    // Notificamos a todos los usuarios que va a salir un usuario
+    cJSON *notif = cJSON_CreateObject();
+    cJSON_AddStringToObject(notif, "type", "LEFT_ROOM");
+    cJSON_AddStringToObject(notif, "roomname", roomname->valuestring);
+    cJSON_AddStringToObject(notif, "username", username);
+
+    notificar_usuarios_vista(room->usuarios, socket_cliente, notif);
+
+    // Ya que les notificamos, lo sacamos
+    eliminar_cliente(room->usuarios, socket_cliente);
+    
+    // Ya por útimo, verificaremos que el usuario que va a salir no sea el último, para que en caso de que sí, se elimine la sala
+    if(room->usuarios->numClientes < 1) {
+        eliminar_sala(lista_salas, roomname->valuestring);
+    }
+
+    // Liberamos nuestra memoria
+    cJSON_Delete(notif);
 }

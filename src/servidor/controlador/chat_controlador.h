@@ -18,5 +18,7 @@ void newroom(int socket_cliente, cJSON *json, ListaSalas *lista_salas, ListaClie
 void invite(int socket_cliente, cJSON *json, ListaSalas *lista_salas, ListaClientes *lista);
 void joinroom(int socket_cliente, cJSON *json, ListaSalas *lista_salas, ListaClientes *lista);
 void roomusers(int socket_sliente, cJSON *json, ListaSalas *lista_salas, ListaClientes *lista);
+void roomtext(int socket_cliente, cJSON *json, ListaSalas *lista_salas, ListaClientes *lista);
+void leaveroom(int socket_cliente, cJSON *json, ListaSalas *lista_salas, ListaClientes *lista);
 
 #endif
