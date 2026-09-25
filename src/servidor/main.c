@@ -5,12 +5,12 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <pthread.h>
-#include <cjson/cJSON.h>
 
 // Esto de aquí es todo el modelo MVC que hicimos en las otras carpetas
 #include "modelo/lista_clientes.h"
 #include "modelo/lista_salas.h"
 #include "controlador/chat_controlador.h"
+#include "modelo/cJSON.h"
 
 // Esta pequeña estructura existe para poder empaquetar los datos que necesitamos en el hilo de ejcución y ya xd
 typedef struct DatosHilo{
