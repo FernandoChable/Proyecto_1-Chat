@@ -52,7 +52,7 @@ namespace ClienteChat.servicios
             try
             {
                 string? linea;
-                while ((linea = _reader.ReadLine()) != null)
+                while ((linea = _reader?.ReadLine()) != null)
                 {
                     // Le notificamos a nuestro evento que llegó un mensaje del servidor
                     OnMessageReceived?.Invoke(linea);

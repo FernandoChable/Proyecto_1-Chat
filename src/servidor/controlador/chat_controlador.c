@@ -66,6 +66,11 @@ void identificar_tipo(cJSON *json, int socket_cliente, ListaClientes *lista_clie
         if(strcmp(type->valuestring, "LEAVE_ROOM") == 0) {
             leaveroom(socket_cliente, json, lista_salas, lista_clientes);
         }
+
+        // En caso de que sea type DISCONNECT
+        if(strcmp(type->valuestring, "DISCONNECT") == 0) {
+            disconnect(socket_cliente, lista_salas, lista_clientes);
+        }
     }
 }
 
@@ -738,4 +743,62 @@ void leaveroom(int socket_cliente, cJSON *json, ListaSalas *lista_salas, ListaCl
 
     // Liberamos nuestra memoria
     cJSON_Delete(notif);
+}
+
+// Definición de
+// DISCONNECT (Última definición)
+// :D
+void disconnect(int socket_cliente, ListaSalas *lista_salas, ListaClientes *lista) {
+    cJSON *notif_disconnect = cJSON_CreateObject();
+
+    // Primero vamos a conseguir el username del usuario que va a salir pues nos servirá
+    ClienteNodo *actual = lista->cabeza;
+    char *username = NULL;
+    while(actual != NULL) {
+        if(actual->socket == socket_cliente) {
+            username = actual->username;
+        }
+
+        actual = actual->siguiente;
+    }
+
+    // Antes de desconectarlo del chat, vamos a sacarlo de todas las salas a las que pertenezca (si es que lo hace)
+    NodoSala *actual_sala = lista_salas->cabeza;
+    while(actual_sala != NULL) {
+        if(buscar_cliente(actual_sala->usuarios, username) == 1) {
+            // No puedo usar el método leaveroom porque no tengo json para pasarle ahhhh
+            // Vamos a avisarle a los demás miembros de la sala antes de sacarlo
+            cJSON *notif = cJSON_CreateObject();
+            cJSON_AddStringToObject(notif, "type", "LEFT_ROOM");
+            cJSON_AddStringToObject(notif, "roomname", actual_sala->room_name);
+            cJSON_AddStringToObject(notif, "username", username);
+
+            notificar_usuarios_vista(actual_sala->usuarios, socket_cliente, notif);
+            
+            // Y ahora sí eliminamos al cliente
+            eliminar_cliente(actual_sala->usuarios, socket_cliente);
+
+            // También hay que eliminar la sala en caso de que haya sido el último en salir
+            if(actual_sala->usuarios->numClientes < 1) {
+                eliminar_sala(lista_salas, actual_sala->room_name);
+            }
+
+            // Y liberamos la memoria
+            cJSON_Delete(notif);
+        }
+
+        actual_sala = actual_sala->siguiente;
+    }
+
+    // Ya que lo sacamos de todas las salas a las que haya pertenecido, mandamos un JSON a todos los usuarios
+    cJSON_AddStringToObject(notif_disconnect, "type", "DISCONNECTED");
+    cJSON_AddStringToObject(notif_disconnect, "username", username);
+
+    notificar_usuarios_vista(lista, socket_cliente, notif_disconnect);
+
+    // Luego eliminamos al usuario de la lista de clientes
+    eliminar_cliente(lista, socket_cliente);
+
+    // Y por último liberamos memoria
+    cJSON_Delete(notif_disconnect);
 }

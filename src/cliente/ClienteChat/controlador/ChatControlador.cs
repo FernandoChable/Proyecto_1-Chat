@@ -108,6 +108,11 @@ namespace ClienteChat.controlador
                     LeaveRoom(argumento);
                     break;
 
+                // El comando es DISCONNECT
+                case "/disconnect":
+                    Disconnect();
+                    break;
+
                 default:
                 _view.MostrarError($"Introduzca un comando válido ({comando} no lo es).");
                 break;
@@ -428,6 +433,18 @@ namespace ClienteChat.controlador
         // Definición de
         // DISCONNECT
         // :D (YA ES EL ULTIMOOOOO)
+        public void Disconnect()
+        {
+            // Aquí no hay nada que verificar si está vacío o no
+            var disconnect_json = new JsonObject();
+
+            disconnect_json["type"] = "DISCONNECT";
+
+            // Mandamos por decimo segunda y última vez el JSON :D
+            string json_texto = disconnect_json.ToJsonString();
+            _networkService.Enviar(json_texto);
+            Environment.Exit(1);
+        }
 
         // Ya estos métodos de aquí abajo sirve para escuchar las respuestas del servidor
 
@@ -536,6 +553,12 @@ namespace ClienteChat.controlador
                         string user = raiz.GetProperty("username").GetString() ?? "Anónimo";
 
                         _view.MostrarMensajeSala($"[{roomname}]: {user} ha dejado la sala :(");
+                    }
+                    else if(tipo == "DISCONNECTED")
+                    {
+                        string user = raiz.GetProperty("username").GetString() ?? "Anónimo";
+
+                        _view.MostrarInformacion($"[Notificación]: {user} ha dejado el chat :(");
                     }
                     else
                     {

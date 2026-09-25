@@ -45,8 +45,13 @@ void *atender_cliente(void *arg) {
 
         // Lectura de datos
         int new_read = read(socket_cliente, buffer, tamano_buffer); //Leemos los datos enviados por el cliente.
-        if(new_read < 0) { //Comprobamos si hubo algún error al leer los datos.
-            printf("Error al leer los datos\n");
+        if(new_read <= 0) { //Comprobamos si hubo algún error al leer los datos o si se desconectó el usuario
+            if(new_read < 0) {
+                printf("Error al leer los datos.\n");
+            } else {
+                printf("El usuario se ha desconectado.\n");
+            }
+
             break;
         }
         
