@@ -476,7 +476,8 @@ namespace ClienteChat.controlador
                             {
                                 _usuario.EstaIdentificado = true;
                             }
-                        } else
+                        }
+                        else
                         {
                             _view.MostrarError($"Error en {operation}: {result}");
                         }
